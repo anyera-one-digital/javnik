@@ -1,0 +1,43 @@
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# VSC
+.history
+
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/venv/
+backend/.venv
+backend/media/
+backend/staticfiles/
+backend/db.sqlite3
+
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore

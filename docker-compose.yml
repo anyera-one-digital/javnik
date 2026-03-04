@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bookly_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bookly_db}
+      POSTGRES_USER: ${POSTGRES_USER:-bookly_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bookly_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bookly_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bookly_backend
+    command: >
+      sh -c "python manage.py makemigrations --noinput &&
+             python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+      - ./content:/app/content:ro
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - EMAIL_VERIFY_ADMIN_CODE=${EMAIL_VERIFY_ADMIN_CODE:-000000}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-bookly_user}:${POSTGRES_PASSWORD:-bookly_password}@db:5432/${POSTGRES_DB:-bookly_db}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,backend}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: bookly_frontend
+    command: pnpm dev --host 0.0.0.0
+    volumes:
+      - .:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_nuxt:/app/.nuxt
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - CI=true
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=4000
+      - API_BASE_URL=http://backend:8000
+      - NUXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+  frontend_node_modules:
+  frontend_nuxt:

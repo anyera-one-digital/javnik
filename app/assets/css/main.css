@@ -1,0 +1,448 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@source "../../../content/**/*";
+
+@theme static {
+  --font-sans: 'Public Sans', sans-serif;
+
+  /* Палитра Tailwind lime, акцент lime-600 (#65a30d) */
+  --color-lime-50: #f7fee7;
+  --color-lime-100: #ecfccb;
+  --color-lime-200: #d9f99d;
+  --color-lime-300: #bef264;
+  --color-lime-400: #a3e635;
+  --color-lime-500: #65a30d;
+  --color-lime-600: #65a30d;
+  --color-lime-700: #65a30d;
+  --color-lime-800: #4d7c0f;
+  --color-lime-900: #365314;
+  --color-lime-950: #1a2e05;
+}
+
+.dark {
+  --ui-bg: var(--ui-color-neutral-950);
+  --ui-bg-muted: var(--ui-color-neutral-900);
+  --ui-bg-elevated: var(--ui-color-neutral-900);
+  --ui-bg-accented: var(--ui-color-neutral-800);
+}
+
+/* Единый акцентный цвет — Tailwind lime-600 (#65a30d) */
+:root {
+  --ui-color-primary-50: #f7fee7;
+  --ui-color-primary-100: #ecfccb;
+  --ui-color-primary-200: #d9f99d;
+  --ui-color-primary-300: #bef264;
+  --ui-color-primary-400: #a3e635;
+  --ui-color-primary-500: #65a30d;
+  --ui-color-primary-600: #65a30d;
+  --ui-color-primary-700: #65a30d;
+  --ui-color-primary-800: #4d7c0f;
+  --ui-color-primary-900: #365314;
+  --ui-color-primary-950: #1a2e05;
+  --color-primary-500: #65a30d;
+  --color-primary-600: #65a30d;
+  --color-primary-700: #65a30d;
+  /* Глобальное переопределение для Nuxt UI */
+  --ui-color-primary: #65a30d;
+  --color-primary: #65a30d;
+}
+
+/* Глобальные стили для кнопок - border-radius 30px (подстраховка для app.config) */
+button,
+[role="button"],
+button[type="button"],
+button[type="submit"],
+button[type="reset"],
+a[role="button"],
+[class*="ui-button"],
+button[class*="rounded"],
+[class*="rounded"] button {
+  border-radius: 30px !important;
+}
+
+/* Nuxt UI UButton (рендерится как a или button) */
+a.inline-flex.items-center[class*="cursor-pointer"],
+a.inline-flex.items-center.justify-center,
+button.inline-flex.items-center {
+  border-radius: 30px !important;
+}
+
+/* Специфичные стили для Nuxt UI компонентов */
+[data-headlessui-state],
+button[class*="ui-"],
+a[class*="ui-button"] {
+  border-radius: 30px !important;
+}
+
+/* Стили для полной заливки звезд (акцент lime-600) */
+[class*="text-primary"] svg,
+[class*="text-primary"] svg path,
+[class*="text-primary"] svg * {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  stroke-width: 0 !important;
+}
+
+/* Принудительное применение lime-600 для всех primary элементов */
+.text-primary,
+.text-primary-500,
+.text-primary-600,
+.text-primary-700,
+[class*="text-primary"]:not([class*="text-primary-50"]):not([class*="text-primary-100"]):not([class*="text-primary-200"]):not([class*="text-primary-300"]):not([class*="text-primary-400"]):not([class*="text-primary-800"]):not([class*="text-primary-900"]):not([class*="text-primary-950"]) {
+  color: #65a30d !important;
+}
+
+/* Фон primary — только для элементов с явным классом bg-primary (не outline/ghost) */
+.bg-primary:not([class*="outline"]):not([class*="ghost"]),
+.bg-primary-500:not([class*="outline"]):not([class*="ghost"]),
+.bg-primary-600:not([class*="outline"]):not([class*="ghost"]),
+.bg-primary-700:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: #65a30d !important;
+}
+
+/* Обводка primary — для outline и для элементов с border-primary */
+.border-primary,
+.border-primary-500,
+.border-primary-600,
+.border-primary-700,
+[class*="border-primary"]:not([class*="border-primary-50"]):not([class*="border-primary-100"]):not([class*="border-primary-200"]):not([class*="border-primary-300"]):not([class*="border-primary-400"]):not([class*="border-primary-800"]):not([class*="border-primary-900"]):not([class*="border-primary-950"]) {
+  border-color: #65a30d !important;
+}
+
+/* Nuxt UI: не заливать кнопки с variant outline/ghost — оставляем только переменные.
+   Заливка применяется темой только к solid. */
+[data-headlessui-state][class*="primary"],
+button[class*="primary"],
+[class*="UButton"][class*="primary"],
+[class*="ui-button"][class*="primary"] {
+  --ui-color-primary: #65a30d !important;
+  --color-primary: #65a30d !important;
+}
+
+/* Формы входа/регистрации — без зелёного акцента */
+.auth-forms-neutral [class*="ring-primary"],
+.auth-forms-neutral [class*="border-primary"]:focus,
+.auth-forms-neutral input:focus,
+.auth-forms-neutral [class*="UInput"]:focus-within {
+  --tw-ring-color: var(--ui-color-neutral-400) !important;
+  border-color: var(--ui-color-neutral-400) !important;
+}
+.auth-forms-neutral a[class*="text-primary"] {
+  color: var(--ui-color-foreground) !important;
+}
+
+/* Стили для навигации в хедере - белые ссылки с подчеркиванием ТОЛЬКО при ховере */
+/* Максимально агрессивные селекторы для переопределения всех стилей Nuxt UI */
+.header-nav a,
+.header-nav a:visited,
+.header-nav a:link,
+.header-nav a:active,
+.header-nav a:focus,
+.header-nav button,
+.header-nav button:visited,
+.header-nav button:link,
+.header-nav button:active,
+.header-nav button:focus,
+.header-nav [role="link"],
+.header-nav [role="button"],
+.header-nav nav a,
+.header-nav nav button,
+.header-nav ul a,
+.header-nav ul button,
+.header-nav li a,
+.header-nav li button,
+.header-nav li span,
+.header-nav span,
+.header-nav [class*="ui-navigation-menu"] a,
+.header-nav [class*="ui-navigation-menu"] button,
+.header-nav [class*="ui-navigation-menu"] span,
+.header-nav [class*="text-primary"],
+.header-nav [class*="text-green"],
+.header-nav [class*="text-lime"],
+.header-nav [class*="text-primary-"],
+.header-nav [class*="text-green-"],
+.header-nav [class*="text-lime-"] {
+  color: white !important;
+  text-decoration: none !important;
+  text-decoration-color: white !important;
+  transition: text-decoration 0.2s ease !important;
+  font-size: 0.8125rem !important; /* 13px - еще меньше */
+}
+
+/* Убираем подчеркивание для активных ссылок */
+.header-nav a[aria-current="page"],
+.header-nav a.active,
+.header-nav a[class*="active"],
+.header-nav button[aria-current="page"],
+.header-nav button.active,
+.header-nav button[class*="active"],
+.header-nav [role="link"][aria-current="page"],
+.header-nav [role="link"].active,
+.header-nav [data-headlessui-state="active"],
+.header-nav [class*="active"] a,
+.header-nav [class*="active"] button {
+  color: white !important;
+  text-decoration: none !important;
+}
+
+/* Подчеркивание ТОЛЬКО при ховере */
+.header-nav a:hover,
+.header-nav button:hover,
+.header-nav [role="link"]:hover,
+.header-nav nav a:hover,
+.header-nav nav button:hover,
+.header-nav ul a:hover,
+.header-nav ul button:hover,
+.header-nav li a:hover,
+.header-nav li button:hover,
+.header-nav [class*="ui-navigation-menu"] a:hover,
+.header-nav [class*="ui-navigation-menu"] button:hover {
+  color: white !important;
+  text-decoration: underline !important;
+  text-decoration-color: white !important;
+  text-underline-offset: 4px !important;
+}
+
+/* Переопределение для светлой темы - темный текст на светлом фоне */
+.light .header-nav a,
+.light .header-nav a:visited,
+.light .header-nav a:link,
+.light .header-nav a:active,
+.light .header-nav a:focus,
+.light .header-nav button,
+.light .header-nav button:visited,
+.light .header-nav button:link,
+.light .header-nav button:active,
+.light .header-nav button:focus,
+.light .header-nav [role="link"],
+.light .header-nav [role="button"],
+.light .header-nav nav a,
+.light .header-nav nav button,
+.light .header-nav ul a,
+.light .header-nav ul button,
+.light .header-nav li a,
+.light .header-nav li button,
+.light .header-nav li span,
+.light .header-nav span,
+.light .header-nav [class*="ui-navigation-menu"] a,
+.light .header-nav [class*="ui-navigation-menu"] button,
+.light .header-nav [class*="ui-navigation-menu"] span,
+.light .header-nav [class*="text-primary"],
+.light .header-nav [class*="text-green"],
+.light .header-nav [class*="text-lime"],
+.light .header-nav [class*="text-primary-"],
+.light .header-nav [class*="text-green-"],
+.light .header-nav [class*="text-lime-"] {
+  color: #1f2937 !important; /* dark gray для светлой темы */
+  text-decoration: none !important;
+  text-decoration-color: #1f2937 !important;
+  transition: text-decoration 0.2s ease !important;
+  font-size: 0.8125rem !important;
+}
+
+.light .header-nav a:hover,
+.light .header-nav button:hover,
+.light .header-nav [role="link"]:hover,
+.light .header-nav nav a:hover,
+.light .header-nav nav button:hover,
+.light .header-nav ul a:hover,
+.light .header-nav ul button:hover,
+.light .header-nav li a:hover,
+.light .header-nav li button:hover,
+.light .header-nav [class*="ui-navigation-menu"] a:hover,
+.light .header-nav [class*="ui-navigation-menu"] button:hover {
+  color: #1f2937 !important;
+  text-decoration: underline !important;
+  text-decoration-color: #1f2937 !important;
+  text-underline-offset: 4px !important;
+}
+
+.light .header-nav a[aria-current="page"],
+.light .header-nav a.active,
+.light .header-nav a[class*="active"],
+.light .header-nav button[aria-current="page"],
+.light .header-nav button.active,
+.light .header-nav button[class*="active"],
+.light .header-nav [role="link"][aria-current="page"],
+.light .header-nav [role="link"].active,
+.light .header-nav [data-headlessui-state="active"],
+.light .header-nav [class*="active"] a,
+.light .header-nav [class*="active"] button {
+  color: #1f2937 !important;
+  text-decoration: none !important;
+}
+
+/* Лендинг: монохромные кнопки — белые/с белой обводкой в тёмной теме, тёмные в светлой */
+.landing-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: #18181b !important;
+  color: white !important;
+}
+
+.landing-page [class*="ui-button"][class*="neutral"][class*="outline"] {
+  border-color: #18181b !important;
+  color: #18181b !important;
+}
+
+.dark .landing-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: white !important;
+  color: #18181b !important;
+}
+
+.dark .landing-page [class*="ui-button"][class*="neutral"][class*="outline"] {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  color: white !important;
+}
+
+.dark .landing-page [class*="ui-button"][class*="neutral"][class*="outline"]:hover {
+  border-color: white !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .landing-page [class*="ui-button"][class*="neutral"][class*="ghost"] {
+  color: white !important;
+}
+
+/* Auth pages: монохромные кнопки — как на главной (черные в светлой теме, белые в темной) */
+.auth-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: #18181b !important;
+  color: white !important;
+}
+
+.auth-page [class*="ui-button"][class*="neutral"][class*="outline"] {
+  border-color: #18181b !important;
+  color: #18181b !important;
+}
+
+.dark .auth-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: white !important;
+  color: #18181b !important;
+}
+
+.dark .auth-page [class*="ui-button"][class*="neutral"][class*="outline"] {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  color: white !important;
+}
+
+.dark .auth-page [class*="ui-button"][class*="neutral"][class*="outline"]:hover {
+  border-color: white !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .auth-page [class*="ui-button"][class*="neutral"][class*="ghost"] {
+  color: white !important;
+}
+
+/* Dashboard (личный кабинет): монохромный акцент — черный (светлая) / белый (темная) */
+.dashboard-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: #18181b !important;
+  color: white !important;
+}
+
+.dark .dashboard-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: white !important;
+  color: #18181b !important;
+}
+
+/* Dashboard: активный пункт навигации — черный текст/иконка в светлой теме */
+.dashboard-page [class*="ui-navigation-menu"] a[aria-current="page"],
+.dashboard-page [class*="ui-navigation-menu"] [aria-current="page"] {
+  color: #18181b !important;
+}
+
+.dashboard-page [class*="ui-navigation-menu"] a[aria-current="page"] svg,
+.dashboard-page [class*="ui-navigation-menu"] [aria-current="page"] svg {
+  color: #18181b !important;
+  fill: #18181b !important;
+}
+
+/* Dashboard: активный пункт навигации — белый текст/иконка в темной теме */
+.dark .dashboard-page [class*="ui-navigation-menu"] a[aria-current="page"],
+.dark .dashboard-page [class*="ui-navigation-menu"] [aria-current="page"] {
+  color: white !important;
+}
+
+.dark .dashboard-page [class*="ui-navigation-menu"] a[aria-current="page"] svg,
+.dark .dashboard-page [class*="ui-navigation-menu"] [aria-current="page"] svg {
+  color: white !important;
+  fill: white !important;
+}
+
+/* Dashboard: активная вкладка UTabs — монохром (индикатор + текст) */
+.dashboard-page [data-slot="indicator"] {
+  background-color: #18181b !important;
+}
+
+.dark .dashboard-page [data-slot="indicator"] {
+  background-color: white !important;
+}
+
+.dashboard-page [data-state="active"] {
+  color: white !important;
+}
+
+.dark .dashboard-page [data-state="active"] {
+  color: #18181b !important;
+}
+
+/* Dashboard: тарифы — монохром вместо зелёного (ring, кнопки) */
+.dashboard-page #payment [class*="ring-primary"],
+.dashboard-page #payment [class*="ring-accented"],
+.dashboard-page [class*="ui-pricing-plan"][class*="ring-primary"],
+.dashboard-page [class*="ui-pricing-plan"][class*="ring-accented"] {
+  --tw-ring-color: rgb(63 63 70) !important;
+  border-color: rgb(63 63 70) !important;
+}
+
+.dark .dashboard-page #payment [class*="ring-primary"],
+.dark .dashboard-page #payment [class*="ring-accented"],
+.dark .dashboard-page [class*="ui-pricing-plan"][class*="ring-primary"],
+.dark .dashboard-page [class*="ui-pricing-plan"][class*="ring-accented"] {
+  --tw-ring-color: rgba(255, 255, 255, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Выделенный план в тарифах — монохром вместо зелёного */
+.landing-page #pricing [class*="ring-primary"],
+.landing-page #pricing [class*="ring-accented"] {
+  --tw-ring-color: rgb(63 63 70) !important;
+  border-color: rgb(63 63 70) !important;
+}
+
+.dark .landing-page #pricing [class*="ring-primary"],
+.dark .landing-page #pricing [class*="ring-accented"] {
+  --tw-ring-color: rgba(255, 255, 255, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Dashboard sidebar: компактные пункты меню — меньший шрифт, отступы, иконки */
+.dashboard-sidebar-content [class*="ui-navigation-menu"] a,
+.dashboard-sidebar-content [class*="ui-navigation-menu"] button,
+.dashboard-sidebar-content [class*="ui-navigation-menu"] [role="link"] {
+  font-size: 0.625rem !important; /* 10px, было 12px */
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  gap: 12px !important;
+}
+
+.dashboard-sidebar-content [class*="ui-navigation-menu"] li {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.dashboard-sidebar-content [class*="ui-navigation-menu"] ul,
+.dashboard-sidebar-content [class*="ui-navigation-menu"] nav {
+  gap: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.dashboard-sidebar-content [class*="ui-navigation-menu"] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.dashboard-sidebar-content [class*="ui-navigation-menu"] svg {
+  width: 0.583rem !important;  /* ~9px, было 14px — уменьшено на треть */
+  height: 0.583rem !important;
+}

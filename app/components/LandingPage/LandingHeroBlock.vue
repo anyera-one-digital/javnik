@@ -1,0 +1,48 @@
+<template>
+  <UPageHero
+    v-if="title"
+    :title="title"
+    :description="description"
+  >
+    <template #title>
+      <MDC
+        :value="title"
+        unwrap="p"
+      />
+    </template>
+
+    <div class="relative">
+      <UPageCard
+        variant="subtle"
+        class="rounded-2xl"
+      >
+        <video
+          class="rounded-xl"
+          preload="none"
+          poster="https://res.cloudinary.com/nuxt/video/upload/so_3.3/v1708511800/ui-pro/video-nuxt-ui-pro_kwfbdh.jpg"
+          controls
+        >
+          <source
+            src="https://res.cloudinary.com/nuxt/video/upload/v1708511800/ui-pro/video-nuxt-ui-pro_kwfbdh.webm"
+            type="video/webm"
+          >
+          <source
+            src="https://res.cloudinary.com/nuxt/video/upload/v1708511800/ui-pro/video-nuxt-ui-pro_kwfbdh.mp4"
+            type="video/mp4"
+          >
+          <source
+            src="https://res.cloudinary.com/nuxt/video/upload/v1708511800/ui-pro/video-nuxt-ui-pro_kwfbdh.ogg"
+            type="video/ogg"
+          >
+        </video>
+      </UPageCard>
+    </div>
+  </UPageHero>
+</template>
+
+<script setup lang="ts">
+defineProps<{
+  title?: string
+  description?: string
+}>()
+</script>

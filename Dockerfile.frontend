@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+# Установка pnpm
+RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
+
+WORKDIR /app
+
+# Копирование файлов зависимостей
+COPY package.json pnpm-lock.yaml* ./
+
+# Установка зависимостей
+RUN pnpm install --frozen-lockfile || pnpm install
+
+# Копирование остального проекта (для production build; в dev volumes перезаписывают)
+COPY . .
+
+EXPOSE 4000
+
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
