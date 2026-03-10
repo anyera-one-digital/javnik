@@ -7,7 +7,8 @@
 dist
 
 # Node dependencies
-node_modules
+frontend/node_modules
+frontend/.pnpm-store
 
 # Logs
 logs
@@ -36,6 +37,19 @@ backend/staticfiles/
 backend/db.sqlite3
 backend/.env
 
-# Старые проекты (удалены после объединения)
-# Inapp/
-# site/
+# Frontend
+frontend/.output
+frontend/.cache
+frontend/dist
+
+# Nginx
+nginx/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/

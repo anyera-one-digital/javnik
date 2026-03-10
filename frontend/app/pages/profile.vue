@@ -10,6 +10,19 @@ definePageMeta({
 const { user, fetchProfile, uploadAvatar, getAuthHeaders } = useAuth()
 const config = useRuntimeConfig()
 const toast = useToast()
+
+// Определяем базовый URL для API
+const getApiUrl = () => {
+  if (process.server) {
+    const config = useRuntimeConfig()
+    return config.apiBase || 'http://backend:8000'
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return ''
+  }
+  const config = useRuntimeConfig()
+  return config.public.apiBase || 'http://localhost:8000'
+}
 const fileRef = ref<HTMLInputElement>()
 const addressSuggestRef = ref<HTMLElement>()
 const addressInputFocused = ref(false)
@@ -35,7 +48,7 @@ onMounted(async () => {
   await fetchProfile()
   specialtiesLoading.value = true
   try {
-    const data = await $fetch<SpecialtyCategoryItem[]>(`${config.public.apiBase}/api/public/specialties/`)
+    const data = await $fetch<SpecialtyCategoryItem[]>(`${getApiUrl()}/api/public/specialties/`)
     const groups = data.map(cat =>
       cat.specialties.map(s => ({ label: s.name, value: s.id }))
     )
@@ -116,7 +129,7 @@ function clearAddress() {
 async function onSubmit(event: FormSubmitEvent<ProfileSchema>) {
   isLoading.value = true
   try {
-    const response = await $fetch<{ user: any; message: string }>(`${config.public.apiBase}/api/auth/profile/update/`, {
+    const response = await $fetch<{ user: any; message: string }>(`${getApiUrl()}/api/auth/profile/update/`, {
       method: 'PATCH',
       headers: {
         ...getAuthHeaders(),

@@ -21,6 +21,19 @@ const emit = defineEmits<{
 
 const toast = useToast()
 
+// Определяем базовый URL для API
+const getApiUrl = () => {
+  if (process.server) {
+    const config = useRuntimeConfig()
+    return config.apiBase || 'http://backend:8000'
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return ''
+  }
+  const config = useRuntimeConfig()
+  return config.public.apiBase || 'http://localhost:8000'
+}
+
 const isOpen = computed({
   get: () => props.modelValue ?? false,
   set: (value) => emit('update:modelValue', value)
@@ -122,7 +135,7 @@ async function onSubmit() {
   try {
     // Определяем URL для создания бронирования
     // Для публичных бронирований — POST на /create/ (GET на том же path только список)
-    const apiBase = config.public.apiBase || 'http://localhost:8000'
+    const apiBase = getApiUrl()
     const bookingUrl = props.username
       ? `${apiBase}/api/public/bookings/${props.username}/create/`
       : '/api/bookings'

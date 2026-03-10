@@ -17,6 +17,19 @@ const config = useRuntimeConfig()
 const colorMode = useColorMode()
 const toast = useToast()
 
+// Определяем базовый URL для API
+const getApiUrl = () => {
+  if (process.server) {
+    const config = useRuntimeConfig()
+    return config.apiBase || 'http://backend:8000'
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return ''
+  }
+  const config = useRuntimeConfig()
+  return config.public.apiBase || 'http://localhost:8000'
+}
+
 const username = computed(() => route.params.username as string)
 
 // Состояния для загрузки данных
@@ -49,7 +62,7 @@ const loadUserProfile = async () => {
     // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
       const config = useRuntimeConfig()
-      const baseUrl = config.public.apiBase || 'http://localhost:8000'
+      const baseUrl = getApiUrl()
       
       // Если URL содержит внутренний хост backend, заменяем на localhost
       if (response.avatar_url.includes('://backend:') || response.avatar_url.includes('://backend/')) {

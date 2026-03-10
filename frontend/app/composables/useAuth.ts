@@ -16,10 +16,24 @@ export const useAuth = () => {
   const router = useRouter()
   const toast = useToast()
 
-  // Состояние аутентификации
-  const user = useState<User | null>('auth.user', () => null)
+  // Определяем базовый URL для API
+  // В production используем относительные пути (пустая строка)
+  // В development используем http://localhost:8000
+  const getApiUrl = () => {
+    if (process.server) {
+      // На сервере используем config.apiBase (внутренний URL)
+      return config.apiBase || 'http://backend:8000'
+    }
+    // На клиенте в production используем относительные пути
+    if (process.env.NODE_ENV === 'production') {
+      return ''
+    }
+    // В development используем localhost
+    return config.public.apiBase || 'http://localhost:8000'
+  }
   const accessToken = useState<string | null>('auth.accessToken', () => null)
   const refreshToken = useState<string | null>('auth.refreshToken', () => null)
+  const user = useState<User | null>('auth.user', () => null)
 
   // Функция для загрузки данных из localStorage
   const loadFromStorage = () => {
@@ -143,7 +157,7 @@ export const useAuth = () => {
     privacy_accepted: boolean
   }) => {
     try {
-      const apiUrl = config.public.apiBase || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await $fetch<AuthResponse & { needs_verification?: boolean; email?: string }>(`${apiUrl}/api/auth/register/`, {
         method: 'POST',
         body: data
@@ -186,7 +200,7 @@ export const useAuth = () => {
   // Подтверждение email (шаг 2 регистрации)
   const verifyEmail = async (email: string, code: string) => {
     try {
-      const apiUrl = config.public.apiBase || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await $fetch<AuthResponse>(`${apiUrl}/api/auth/verify-email/`, {
         method: 'POST',
         body: { email, code }
@@ -213,7 +227,7 @@ export const useAuth = () => {
   // Повторная отправка кода подтверждения
   const resendVerificationCode = async (email: string) => {
     try {
-      const apiUrl = config.public.apiBase || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       await $fetch<{ message: string }>(`${apiUrl}/api/auth/resend-verification/`, {
         method: 'POST',
         body: { email }
@@ -238,7 +252,7 @@ export const useAuth = () => {
   // Вход
   const login = async (email: string, password: string) => {
     try {
-      const apiUrl = config.public.apiBase || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await $fetch<AuthResponse & { needs_verification?: boolean; email?: string }>(`${apiUrl}/api/auth/login/`, {
         method: 'POST',
         body: { email, password }
@@ -275,7 +289,7 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       if (refreshToken.value) {
-        await $fetch(`${config.public.apiBase}/api/auth/logout/`, {
+        await $fetch(`${getApiUrl()}/api/auth/logout/`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken.value}`
@@ -306,7 +320,7 @@ export const useAuth = () => {
     }
 
     try {
-      const response = await $fetch<{ access: string }>(`${config.public.apiBase}/api/auth/token/refresh/`, {
+      const response = await $fetch<{ access: string }>(`${getApiUrl()}/api/auth/token/refresh/`, {
         method: 'POST',
         body: {
           refresh: refreshToken.value
@@ -360,7 +374,7 @@ export const useAuth = () => {
   }) => {
     try {
       const profile = await $fetch<{ user: User; message: string }>(
-        `${config.public.apiBase}/api/auth/profile/update/`,
+        `${getApiUrl()}/api/auth/profile/update/`,
         {
           method: 'PATCH',
           headers: getAuthHeaders(),
@@ -395,7 +409,7 @@ export const useAuth = () => {
     }
 
     try {
-      const profile = await $fetch<User>(`${config.public.apiBase}/api/auth/profile/`, {
+      const profile = await $fetch<User>(`${getApiUrl()}/api/auth/profile/`, {
         headers: getAuthHeaders()
       })
       user.value = profile
@@ -427,7 +441,7 @@ export const useAuth = () => {
       formData.append('avatar', file)
 
       // Используем fetch напрямую для FormData, так как $fetch может некорректно обрабатывать заголовки
-      const apiUrl = config.public.apiBase || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const token = accessToken.value
       
       if (process.client) {

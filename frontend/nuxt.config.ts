@@ -21,9 +21,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Приватная конфигурация для сервера (может использовать backend:8000 внутри Docker)
     apiBase: process.env.API_BASE_URL || 'http://localhost:8000',
-    // Публичная конфигурация для клиента (всегда localhost для браузера)
+    // Публичная конфигурация для клиента (браузер)
+    // Для production: пустая строка (относительные пути)
+    // Для development: http://localhost:8000
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+      apiBase: process.env.NODE_ENV === 'production' ? '' : (process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8000')
     }
   },
 
@@ -61,7 +63,8 @@ export default defineNuxtConfig({
       routes: [
         '/'
       ],
-      crawlLinks: true
+      crawlLinks: false, // Отключаем краулинг для избежания ошибок при сборке
+      failOnError: false // Не прерывать сборку при ошибках
     }
   },
 

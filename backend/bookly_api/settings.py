@@ -9,39 +9,46 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ===========================================
+# SECURITY SETTINGS
+# ===========================================
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Админский код для обхода подтверждения email (только при DEBUG).
-# Задайте в .env: EMAIL_VERIFY_ADMIN_CODE=ваш_секретный_код
-# На шаге 2 регистрации введите этот код вместо кода из письма.
 EMAIL_VERIFY_ADMIN_CODE = config('EMAIL_VERIFY_ADMIN_CODE', default=None)
 if DEBUG and not EMAIL_VERIFY_ADMIN_CODE:
-    EMAIL_VERIFY_ADMIN_CODE = '000000'  # По умолчанию при DEBUG
+    EMAIL_VERIFY_ADMIN_CODE = '000000'
 
-# Разрешаем все хосты в режиме разработки, включая backend для Docker
-# В режиме разработки добавляем backend для работы внутри Docker сети
-allowed_hosts_env = config('ALLOWED_HOSTS', default=None)
-if allowed_hosts_env:
-    # Если ALLOWED_HOSTS задан в переменных окружения, используем его
-    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
-else:
-    # Значения по умолчанию в зависимости от режима DEBUG
-    if DEBUG:
-        ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'backend']
-    else:
-        ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# ALLOWED_HOSTS
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1'
+).split(',')
 
-# ВСЕГДА добавляем backend в режиме разработки, даже если он уже есть
-if DEBUG and 'backend' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('backend')
-
-# Логируем для отладки
+# В режиме разработки добавляем дополнительные хосты
 if DEBUG:
-    print(f'DEBUG: ALLOWED_HOSTS = {ALLOWED_HOSTS}')
+    ALLOWED_HOSTS.extend(['0.0.0.0', 'backend', 'nginx', 'localhost:8765'])
+    ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))  # Убираем дубликаты
+
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost,http://localhost:8765,http://localhost:4000,http://127.0.0.1:8765,http://127.0.0.1:4000'
+).split(',')
+
+# Security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+    SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
+    CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
+    SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 INSTALLED_APPS = [
@@ -93,6 +100,9 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'bookly_api.wsgi.application'
+
+# ASGI_APPLICATION для uvicorn
+ASGI_APPLICATION = 'bookly_api.asgi.application'
 
 # Database
 DATABASES = {
@@ -178,7 +188,6 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': config('JWT_ALGORITHM', default='HS256'),
-    'SIGNING_KEY': config('JWT_SECRET_KEY', default=SECRET_KEY),
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
@@ -190,8 +199,59 @@ SIMPLE_JWT = {
 # CORS settings
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:4000,http://localhost:3000,http://frontend:4000',
+    default='http://localhost,http://localhost:80,http://frontend:3000',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 CORS_ALLOW_CREDENTIALS = config('CORS_ALLOW_CREDENTIALS', default=True, cast=bool)
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Разрешить все origins в режиме разработки
+
+# Redis settings
+REDIS_URL = config('REDIS_URL', default='redis://redis:6379/0')
+
+# Cache settings (опционально, можно использовать Redis)
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+#         'LOCATION': REDIS_URL,
+#     }
+# }
+
+# ===========================================
+# LOGGING
+# ===========================================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': config('DJANGO_LOG_LEVEL', default='INFO'),
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}

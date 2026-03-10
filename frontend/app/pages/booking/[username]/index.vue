@@ -16,6 +16,19 @@ const colorMode = useColorMode()
 const { toggle } = usePublicPageColorMode()
 const toast = useToast()
 
+// Определяем базовый URL для API
+const getApiUrl = () => {
+  if (process.server) {
+    const config = useRuntimeConfig()
+    return config.apiBase || 'http://backend:8000'
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return ''
+  }
+  const config = useRuntimeConfig()
+  return config.public.apiBase || 'http://localhost:8000'
+}
+
 const username = computed(() => route.params.username as string)
 
 // Проверяем, находимся ли мы на странице календаря
@@ -79,7 +92,7 @@ const loadUserProfile = async () => {
     // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
       const config = useRuntimeConfig()
-      const baseUrl = config.public.apiBase || 'http://localhost:8000'
+      const baseUrl = getApiUrl()
       
       if (response.avatar_url.includes('://backend:') || response.avatar_url.includes('://backend/')) {
         const urlPath = response.avatar_url.replace(/^https?:\/\/[^\/]+/, '')
@@ -498,7 +511,7 @@ async function submitBooking() {
   isBookingSubmitting.value = true
   try {
     const config = useRuntimeConfig()
-    const apiBase = config.public.apiBase || 'http://localhost:8000'
+    const apiBase = getApiUrl()
     const bookingUrl = `${apiBase}/api/public/bookings/${username.value}/create/`
 
     await $fetch(bookingUrl, {
