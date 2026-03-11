@@ -8,6 +8,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - javnik_network
+    ports:
+      - "5430:5432"
 
   redis:
     image: redis:8.6-alpine
