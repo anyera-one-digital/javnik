@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'django_celery_beat',
     
     # Local apps
     'accounts',
@@ -230,6 +231,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 минут
 CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_SEND_TASK_SENT_EVENT = True
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # ===========================================
 # LOGGING
