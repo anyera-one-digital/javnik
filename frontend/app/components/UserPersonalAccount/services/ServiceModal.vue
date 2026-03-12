@@ -255,14 +255,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
     if (props.service) {
       // Обновление существующей услуги
-      await $fetch(`/api/services/${props.service.id}`, {
+      await $fetch(`/api/services/${props.service.id}/`, {
         method: 'PUT',
         headers: {
           Authorization: authToken
         },
         body: formData
       })
-      
+
       toast.add({
         title: 'Успешно',
         description: `Услуга "${event.data.name}" обновлена`,

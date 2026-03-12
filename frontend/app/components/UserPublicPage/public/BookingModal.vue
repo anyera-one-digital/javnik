@@ -138,8 +138,8 @@ async function onSubmit() {
     const apiBase = getApiUrl()
     const bookingUrl = props.username
       ? `${apiBase}/api/public/bookings/${props.username}/create/`
-      : '/api/bookings'
-    
+      : '/api/bookings/'
+
     if (props.event) {
       // Запись на событие
       await $fetch(bookingUrl, {

@@ -67,7 +67,7 @@ async function setStatus(newStatus: 'confirmed' | 'completed') {
       if (ok) headers = getAuthHeaders()
     }
     if (!headers.Authorization) throw new Error('Нет авторизации')
-    await $fetch(`/api/bookings/${props.booking.id}`, {
+    await $fetch(`/api/bookings/${props.booking.id}/`, {
       method: 'PATCH',
       headers,
       body: { status: newStatus }
@@ -110,7 +110,7 @@ async function confirmDelete() {
       if (ok) headers = getAuthHeaders()
     }
     if (!headers.Authorization) throw new Error('Нет авторизации')
-    await $fetch(`/api/bookings/${props.booking.id}`, {
+    await $fetch(`/api/bookings/${props.booking.id}/`, {
       method: 'DELETE',
       headers
     })

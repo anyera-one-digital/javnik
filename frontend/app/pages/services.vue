@@ -217,11 +217,11 @@ async function confirmDeleteService() {
       return
     }
 
-    const token = accessToken.value.startsWith('Bearer ') 
-      ? accessToken.value 
+    const token = accessToken.value.startsWith('Bearer ')
+      ? accessToken.value
       : `Bearer ${accessToken.value}`
 
-    await $fetch(`/api/services/${service.id}`, {
+    await $fetch(`/api/services/${service.id}/`, {
       method: 'DELETE',
       headers: {
         Authorization: token

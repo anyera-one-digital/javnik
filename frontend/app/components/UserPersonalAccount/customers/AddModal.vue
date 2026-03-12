@@ -50,7 +50,7 @@ watch(() => props.customer, (customer) => {
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
     if (props.customer) {
-      await $fetch(`/api/customers/${props.customer.id}`, {
+      await $fetch(`/api/customers/${props.customer.id}/`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: {
@@ -65,7 +65,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'success'
       })
     } else {
-      await $fetch('/api/customers', {
+      await $fetch('/api/customers/', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: {

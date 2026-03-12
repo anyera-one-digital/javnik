@@ -285,10 +285,10 @@ async function onSubmit() {
     })
 
     console.log('EventModal: Headers:', headers.Authorization ? 'Present' : 'Missing')
-    
+
     if (props.event) {
       console.log('EventModal: Updating event:', props.event.id)
-      const response = await $fetch('/api/events', {
+      const response = await $fetch('/api/events/', {
         method: 'PATCH',
         headers,
         body: {
@@ -299,12 +299,12 @@ async function onSubmit() {
       console.log('EventModal: Update response:', response)
     } else {
       console.log('EventModal: Creating new event')
-      console.log('EventModal: Request URL: /api/events')
+      console.log('EventModal: Request URL: /api/events/')
       console.log('EventModal: Request method: POST')
       console.log('EventModal: Request headers:', headers)
       console.log('EventModal: Request body:', body)
-      
-      const response = await $fetch('/api/events', {
+
+      const response = await $fetch('/api/events/', {
         method: 'POST',
         headers,
         body

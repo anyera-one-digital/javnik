@@ -614,7 +614,7 @@ async function onSubmit() {
 
   try {
     if (props.editBooking?.id) {
-      await $fetch(`/api/bookings/${props.editBooking.id}`, {
+      await $fetch(`/api/bookings/${props.editBooking.id}/`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body
@@ -625,7 +625,7 @@ async function onSubmit() {
         color: 'success'
       })
     } else {
-      await $fetch('/api/bookings', {
+      await $fetch('/api/bookings/', {
         method: 'POST',
         headers: getAuthHeaders(),
         body

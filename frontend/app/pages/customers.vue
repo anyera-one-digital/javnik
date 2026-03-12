@@ -117,7 +117,7 @@ async function confirmDeleteCustomer(customer: Customer) {
       return
     }
 
-    await $fetch(`/api/customers/${customer.id}`, {
+    await $fetch(`/api/customers/${customer.id}/`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     })

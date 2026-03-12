@@ -45,7 +45,7 @@ type CodeSchema = z.output<typeof codeSchema>
 async function onEmailSubmit(payload: FormSubmitEvent<EmailSchema>) {
   isLoading.value = true
   try {
-    const response = await $fetch('/api/auth/password-reset', {
+    const response = await $fetch('/api/auth/password-reset/', {
       method: 'POST',
       body: {
         email: payload.data.email
@@ -86,7 +86,7 @@ async function onEmailSubmit(payload: FormSubmitEvent<EmailSchema>) {
 async function onCodeSubmit(payload: FormSubmitEvent<CodeSchema>) {
   isLoading.value = true
   try {
-    await $fetch('/api/auth/password-reset/confirm', {
+    await $fetch('/api/auth/password-reset/confirm/', {
       method: 'POST',
       body: {
         email: email.value,
