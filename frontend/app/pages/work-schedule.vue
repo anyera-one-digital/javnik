@@ -141,8 +141,8 @@ async function loadSchedules() {
     // Загружаем график для текущего месяца
     const startDate = format(monthStart.value, 'yyyy-MM-dd')
     const endDate = format(monthEnd.value, 'yyyy-MM-dd')
-    
-    const response = await $fetch<WorkSchedule[]>('/api/schedule', {
+
+    const response = await $fetch<WorkSchedule[]>('/api/schedule/', {
       headers,
       query: {
         start_date: startDate,
@@ -167,7 +167,7 @@ async function loadSchedules() {
           const headers = getAuthHeaders()
           const startDate = format(monthStart.value, 'yyyy-MM-dd')
           const endDate = format(monthEnd.value, 'yyyy-MM-dd')
-          const response = await $fetch<WorkSchedule[]>('/api/schedule', {
+          const response = await $fetch<WorkSchedule[]>('/api/schedule/', {
             headers,
             query: {
               start_date: startDate,
@@ -277,7 +277,7 @@ async function saveSchedule() {
         
         if (existingSchedule && existingSchedule.id) {
           // Обновляем существующий график
-          const updated = await $fetch<WorkSchedule>(`/api/schedule/${existingSchedule.id}`, {
+          const updated = await $fetch<WorkSchedule>(`/api/schedule/${existingSchedule.id}/`, {
             method: 'PUT',
             headers,
             body: scheduleData
@@ -289,7 +289,7 @@ async function saveSchedule() {
           console.log('Creating schedule for', dateStr)
           console.log('Schedule data:', JSON.stringify(scheduleData, null, 2))
           try {
-            const created = await $fetch<WorkSchedule>('/api/schedule', {
+            const created = await $fetch<WorkSchedule>('/api/schedule/', {
               method: 'POST',
               headers,
               body: scheduleData
@@ -304,7 +304,7 @@ async function saveSchedule() {
               if (refreshed) {
                 headers = getAuthHeaders()
                 // Повторяем запрос
-                const created = await $fetch<WorkSchedule>('/api/schedule', {
+                const created = await $fetch<WorkSchedule>('/api/schedule/', {
                   method: 'POST',
                   headers,
                   body: scheduleData

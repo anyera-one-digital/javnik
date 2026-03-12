@@ -505,11 +505,11 @@ watch(() => form.date, async (dateStr) => {
   if (!headers.Authorization) return
   try {
     const [schedulesRes, bookingsRes] = await Promise.all([
-      $fetch<WorkSchedule[]>(`/api/schedule`, {
+      $fetch<WorkSchedule[]>(`/api/schedule/`, {
         query: { start_date: dateStr, end_date: dateStr },
         headers
       }),
-      $fetch<Booking[]>(`/api/bookings`, {
+      $fetch<Booking[]>(`/api/bookings/`, {
         query: { date: dateStr },
         headers
       })

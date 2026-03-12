@@ -328,8 +328,8 @@ async function loadWorkSchedules() {
       console.warn('No auth headers available for loading work schedules')
       return
     }
-    
-    const response = await $fetch<WorkSchedule[]>('/api/schedule', {
+
+    const response = await $fetch<WorkSchedule[]>('/api/schedule/', {
       query: {
         start_date: startDate,
         end_date: endDate
