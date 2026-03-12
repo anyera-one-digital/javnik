@@ -41,5 +41,5 @@ USER appuser
 # Экспорт порта
 EXPOSE 8000
 
-# Запуск через uvicorn
-CMD ["uvicorn", "bookly_api.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Запуск через daphne
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "bookly_api.asgi:application"]
