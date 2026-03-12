@@ -109,8 +109,9 @@ jobs:
           script: |
             cd /home/javnik/projects/javnik
 
-            docker compose -f docker-compose.production.yml pull backend frontend
-            docker compose -f docker-compose.production.yml up -d --force-recreate
+            docker compose -f docker-compose.production.yml pull
+            docker compose -f docker-compose.production.yml down
+            docker compose -f docker-compose.production.yml up -d
             docker compose -f docker-compose.production.yml exec backend python manage.py migrate
             docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
             docker system prune -af
