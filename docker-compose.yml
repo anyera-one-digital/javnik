@@ -66,6 +66,62 @@ services:
       - javnik_network
     restart: unless-stopped
 
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: javnik_celery_worker
+    volumes:
+      - ./backend/content:/app/content:ro
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - javnik_network
+    restart: unless-stopped
+    command: celery -A bookly_api worker --loglevel=info --concurrency=2
+
+  # Celery Beat (планировщик периодических задач)
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: javnik_celery_beat
+    volumes:
+      - ./backend/content:/app/content:ro
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - javnik_network
+    restart: unless-stopped
+    command: celery -A bookly_api beat --loglevel=info
+
+  # Flower (мониторинг Celery)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: javnik_flower
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - celery_worker
+    networks:
+      - javnik_network
+    restart: unless-stopped
+    command: celery -A bookly_api flower --port=5555
+    ports:
+      - "5555:5555"
+
 networks:
   javnik_network:
     driver: bridge

@@ -62,6 +62,38 @@ services:
       - javnik_network
     restart: unless-stopped
 
+  celery_worker:
+    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
+    container_name: javnik_celery_worker
+    volumes:
+      - ./backend/content:/app/content:ro
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - javnik_network
+    restart: unless-stopped
+    command: celery -A bookly_api worker --loglevel=info --concurrency=2
+
+  celery_beat:
+    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
+    container_name: javnik_celery_beat
+    volumes:
+      - ./backend/content:/app/content:ro
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - javnik_network
+    restart: unless-stopped
+    command: celery -A bookly_api beat --loglevel=info
+
 networks:
   javnik_network:
     driver: bridge

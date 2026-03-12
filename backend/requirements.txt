@@ -9,3 +9,4 @@ requests==2.32
 PyYAML>=6.0
 redis==7.3
 uvicorn[standard]==0.41
+celery==5.6
