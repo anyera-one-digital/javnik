@@ -3,7 +3,7 @@
 # ===========================================
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 RUN apk add --no-cache python3 make g++
 
@@ -29,7 +29,7 @@ ENV NODE_ENV=production
 RUN pnpm build
 
 # Stage 2
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
