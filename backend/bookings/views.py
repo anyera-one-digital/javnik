@@ -1,13 +1,15 @@
+import logging
+from datetime import datetime, timedelta
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
-from django.db.models import Q, Max
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from datetime import datetime, timedelta
+
 from .models import Customer, Service, ServiceImage, Member, Event, Booking, WorkSchedule, Review
 from .serializers import (
     CustomerSerializer,
@@ -18,6 +20,7 @@ from .serializers import (
     WorkScheduleSerializer,
     ReviewSerializer
 )
+from bookings.tasks import send_booking_confirmation_email
 
 User = get_user_model()
 
@@ -561,12 +564,22 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         if serializer.is_valid():
             booking = serializer.save(user=request.user)
-            
+
             # Если это бронирование на событие, увеличиваем счетчик забронированных мест
             if booking.event:
                 booking.event.booked_slots += 1
                 booking.event.save()
-            
+
+            # Отправляем подтверждение бронирования через Celery
+            try:
+                send_booking_confirmation_email.delay(
+                    booking_id=booking.id,
+                    customer_email=booking.customer.email
+                )
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи Celery: {e}')
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

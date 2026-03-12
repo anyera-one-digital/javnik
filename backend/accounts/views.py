@@ -1,15 +1,20 @@
+import hashlib
+import logging
+
 from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from .models import SpecialtyCategory
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils.crypto import get_random_string
-from django.core.mail import send_mail
 from django.conf import settings
+
+from bookings.tasks import send_email_verification_code
+from .models import SpecialtyCategory
 from .serializers import UserRegistrationSerializer, UserSerializer, LoginSerializer
-import hashlib
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -37,14 +42,9 @@ class RegisterView(generics.CreateAPIView):
         cache.set(cache_key, {'code': code, 'email': email, 'user_id': user.id}, timeout=900)
 
         try:
-            send_mail(
-                subject='Подтверждение регистрации',
-                message=f'Ваш код подтверждения: {code}\n\nКод действителен 15 минут.',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-            )
-        except Exception:
+            send_email_verification_code.delay(user_id=user.id, code=code)
+        except Exception as e:
+            logger.error(f'Ошибка отправки задачи Celery: {e}')
             if settings.DEBUG:
                 return Response({
                     'message': 'Код отправлен на почту.',
@@ -156,14 +156,9 @@ def resend_verification_code_view(request):
     cache.set(cache_key, {'code': code, 'email': email, 'user_id': user.id}, timeout=900)
 
     try:
-        send_mail(
-            subject='Подтверждение регистрации',
-            message=f'Ваш код подтверждения: {code}\n\nКод действителен 15 минут.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
-        )
-    except Exception:
+        send_email_verification_code.delay(user_id=user.id, code=code)
+    except Exception as e:
+        logger.error(f'Ошибка отправки задачи Celery: {e}')
         if settings.DEBUG:
             return Response({'message': 'Код отправлен.', 'debug_code': code}, status=status.HTTP_200_OK)
         return Response({'error': 'Ошибка отправки. Попробуйте позже.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -378,7 +373,7 @@ def password_reset_view(request):
     
     # Генерируем 6-значный код
     code = get_random_string(length=6, allowed_chars='0123456789')
-    
+
     # Сохраняем код в кэше на 15 минут
     # Используем хеш email для безопасности
     cache_key = f'password_reset_{hashlib.sha256(email.encode()).hexdigest()}'
@@ -387,18 +382,11 @@ def password_reset_view(request):
         'email': email,
         'user_id': user.id
     }, timeout=900)  # 15 минут
-    
-    # Отправляем email с кодом
+
     try:
-        send_mail(
-            subject='Восстановление пароля',
-            message=f'Ваш код подтверждения для восстановления пароля: {code}\n\nКод действителен в течение 15 минут.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
-        )
+        send_email_verification_code.delay(user_id=user.id, code=code)
     except Exception as e:
-        # Если отправка email не настроена, возвращаем код в ответе (только для разработки)
+        logger.error(f'Ошибка отправки задачи Celery: {e}')
         if settings.DEBUG:
             return Response({
                 'message': 'Код подтверждения отправлен на почту.',
@@ -408,7 +396,7 @@ def password_reset_view(request):
             return Response({
                 'error': 'Ошибка при отправке email. Попробуйте позже.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     return Response({
         'message': 'Код подтверждения отправлен на почту.'
     }, status=status.HTTP_200_OK)
