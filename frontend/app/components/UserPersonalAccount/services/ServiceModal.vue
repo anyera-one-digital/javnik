@@ -270,7 +270,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       })
     } else {
       // Создание новой услуги
-      const createdService = await $fetch<Service>('/api/services', {
+      const createdService = await $fetch<Service>('/api/services/', {
         method: 'POST',
         headers: {
           Authorization: authToken
