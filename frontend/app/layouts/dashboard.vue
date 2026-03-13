@@ -25,7 +25,7 @@ function parseDateFromQuery(dateStr: string | undefined): Date {
 const selectedScheduleDate = ref<Date>(route.path === '/schedule' && route.query.date ? parseDateFromQuery(route.query.date as string) : startOfDay(new Date()))
 
 const { getAuthHeaders } = useAuth()
-const { data: scheduleBookings } = await useFetch<Booking[]>('/api/bookings', {
+const { data: scheduleBookings } = await useFetch<Booking[]>('/api/bookings/', {
   default: () => [],
   headers: () => getAuthHeaders()
 })

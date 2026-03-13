@@ -46,15 +46,15 @@ async function loadBookings() {
       headers = refreshHeaders()
       if (!headers.Authorization) return
     }
-    
+
     try {
       const date = viewMode.value === 'day' ? format(selectedDate.value, 'yyyy-MM-dd') : undefined
-      const url = date ? `/api/bookings?date=${date}` : '/api/bookings'
+      const url = date ? `/api/bookings/?date=${date}` : '/api/bookings/'
       const data = await $fetch<any>(url, { headers })
-      
+
       // Обрабатываем разные форматы ответа
       let bookingsArray: Booking[] = []
-      
+
       if (Array.isArray(data)) {
         bookingsArray = data
       } else if (data && typeof data === 'object') {
@@ -69,7 +69,7 @@ async function loadBookings() {
           bookingsArray = [data]
         }
       }
-      
+
       bookings.value = bookingsArray
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
@@ -77,7 +77,7 @@ async function loadBookings() {
         if (refreshed) {
           headers = getAuthHeaders()
           const date = viewMode.value === 'day' ? format(selectedDate.value, 'yyyy-MM-dd') : undefined
-          const url = date ? `/api/bookings?date=${date}` : '/api/bookings'
+          const url = date ? `/api/bookings/?date=${date}` : '/api/bookings/'
           const retryData = await $fetch<Booking[]>(url, { headers })
           bookings.value = retryData || []
           return
@@ -127,13 +127,13 @@ async function loadAllBookings() {
       headers = refreshHeaders()
       if (!headers.Authorization) return
     }
-    
+
     try {
-      const data = await $fetch<any>('/api/bookings', { headers })
-      
+      const data = await $fetch<any>('/api/bookings/', { headers })
+
       // Обрабатываем разные форматы ответа
       let bookingsArray: Booking[] = []
-      
+
       if (Array.isArray(data)) {
         bookingsArray = data
       } else if (data && typeof data === 'object') {
@@ -148,14 +148,14 @@ async function loadAllBookings() {
           bookingsArray = [data]
         }
       }
-      
+
       allBookings.value = bookingsArray
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-          const retryData = await $fetch<Booking[]>('/api/bookings', { headers })
+          const retryData = await $fetch<Booking[]>('/api/bookings/', { headers })
           allBookings.value = retryData || []
           return
         }
