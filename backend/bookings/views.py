@@ -20,7 +20,8 @@ from .serializers import (
     WorkScheduleSerializer,
     ReviewSerializer
 )
-from bookings.tasks import send_booking_confirmation_email
+from bookings.tasks import send_booking_confirmation_email, send_new_booking_notification_to_staff, \
+    send_booking_pending_notification
 
 User = get_user_model()
 
@@ -941,11 +942,15 @@ def public_booking_create_view(request, username):
     if event:
         event.booked_slots += 1
         event.save()
-    
+
+    send_new_booking_notification_to_staff.delay(booking.id)
+    send_booking_pending_notification.delay(booking.id, customer_email)
+
     serializer = BookingSerializer(booking)
+
     return Response({
         'booking': serializer.data,
-        'message': 'Бронирование успешно создано.'
+        'message': 'Заявка на бронирование создана и ожидает подтверждения.'
     }, status=status.HTTP_201_CREATED)
 
 
