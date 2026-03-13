@@ -263,7 +263,7 @@ const loadReviews = async () => {
   if (!username.value) return
   reviewsPending.value = true
   try {
-    const response = await $fetch<Review[]>(`/api/public/reviews/${username.value}`)
+    const response = await $fetch<Review[]>(`/api/public/reviews/${username.value}/`)
     reviews.value = Array.isArray(response) ? response : []
   } catch {
     reviews.value = []
