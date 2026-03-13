@@ -96,16 +96,16 @@ async function loadServices() {
   try {
     let headers = getAuthHeaders()
     if (!headers.Authorization) return
-    
+
     try {
-      const data = await $fetch<Service[]>('/api/services', { headers })
+      const data = await $fetch<Service[]>('/api/services/', { headers })
       services.value = data || []
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-          const retryData = await $fetch<Service[]>('/api/services', { headers })
+          const retryData = await $fetch<Service[]>('/api/services/', { headers })
           services.value = retryData || []
           return
         }

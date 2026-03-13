@@ -40,12 +40,12 @@ async function loadCustomers() {
       customers.value = []
       return
     }
-    
+
     try {
-      const data = await $fetch<any>('/api/customers', {
+      const data = await $fetch<any>('/api/customers/', {
         headers
       })
-      
+
       // Убеждаемся, что data - это массив
       if (Array.isArray(data)) {
         customers.value = data as Customer[]
@@ -60,13 +60,13 @@ async function loadCustomers() {
       if (error.statusCode === 401 || error.status === 401) {
         console.log('Got 401 for customers, attempting to refresh token...')
         const refreshed = await refreshAccessToken()
-        
+
         if (refreshed) {
           console.log('Token refreshed, retrying customers request...')
           headers = getAuthHeaders()
-          
+
           try {
-            const retryData = await $fetch<any>('/api/customers', {
+            const retryData = await $fetch<any>('/api/customers/', {
               headers
             })
             

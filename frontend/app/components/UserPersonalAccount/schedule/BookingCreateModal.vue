@@ -58,12 +58,12 @@ async function loadCustomers() {
     let headers = getAuthHeaders()
     
     if (!headers.Authorization) return
-    
+
     try {
-      const data = await $fetch<any>('/api/customers', {
+      const data = await $fetch<any>('/api/customers/', {
         headers
       })
-      
+
       // Убеждаемся, что data - это массив
       if (Array.isArray(data)) {
         customers.value = data as Customer[]
@@ -73,19 +73,19 @@ async function loadCustomers() {
       } else {
         customers.value = []
       }
-      
+
       // Принудительно обновляем селекторы
       forceUpdateSelectors()
     } catch (error: any) {
       // Если получили 401, пытаемся обновить токен
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
-        
+
         if (refreshed) {
           headers = getAuthHeaders()
-          
+
           try {
-            const retryData = await $fetch<any>('/api/customers', {
+            const retryData = await $fetch<any>('/api/customers/', {
               headers
             })
             
@@ -131,12 +131,12 @@ async function loadServices() {
       services.value = []
       return
     }
-    
+
     try {
-      const data = await $fetch<Service[]>('/api/services', {
+      const data = await $fetch<Service[]>('/api/services/', {
         headers
       })
-      
+
       // Убеждаемся, что data - это массив
       if (Array.isArray(data)) {
         services.value = [...data] // Создаем новый массив для реактивности
@@ -147,19 +147,19 @@ async function loadServices() {
       } else {
         services.value = []
       }
-      
+
       forceUpdateSelectors()
       await nextTick()
     } catch (error: any) {
       // Если получили 401, пытаемся обновить токен
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
-        
+
         if (refreshed) {
           headers = getAuthHeaders()
-          
+
           try {
-            const retryData = await $fetch<Service[]>('/api/services', {
+            const retryData = await $fetch<Service[]>('/api/services/', {
               headers
             })
             

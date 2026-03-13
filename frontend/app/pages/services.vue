@@ -37,15 +37,15 @@ async function loadServices() {
       // Добавляем Bearer один раз
       token = `Bearer ${token}`
     }
-    
+
     console.log('Loading services with token:', token ? token.substring(0, 30) + '...' : 'No token')
-    
-    const response = await $fetch<any>('/api/services', {
+
+    const response = await $fetch<any>('/api/services/', {
       headers: {
         Authorization: token
       }
     })
-    
+
     // Убеждаемся, что response - это массив
     let servicesArray: Service[] = []
     if (Array.isArray(response)) {
@@ -54,7 +54,7 @@ async function loadServices() {
       // Если это пагинированный ответ Django REST Framework
       servicesArray = response.results || []
     }
-    
+
     console.log('Services loaded successfully:', servicesArray)
     console.log('Services count:', servicesArray.length)
     console.log('Response type:', Array.isArray(response) ? 'array' : typeof response)

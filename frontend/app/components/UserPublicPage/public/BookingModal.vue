@@ -53,9 +53,9 @@ const isSubmitting = ref(false)
 const config = useRuntimeConfig()
 
 // Загружаем услуги - либо публичные по username, либо авторизованные
-const servicesUrl = props.username 
-  ? `/api/public/services/${props.username}`
-  : '/api/services'
+const servicesUrl = props.username
+  ? `/api/public/services/${props.username}/`
+  : '/api/services/'
 
 const { data: services } = await useFetch<Service[]>(servicesUrl, {
   default: () => []

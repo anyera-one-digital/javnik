@@ -43,16 +43,16 @@ async function loadServices() {
       console.warn('EventModal: No auth token available for loading services')
       return
     }
-    
+
     try {
-      const data = await $fetch<Service[]>('/api/services', {
+      const data = await $fetch<Service[]>('/api/services/', {
         headers
       })
-      
+
       console.log('EventModal: Services loaded:', data)
       console.log('EventModal: Services count:', data?.length || 0)
       console.log('EventModal: Services type:', Array.isArray(data) ? 'array' : typeof data)
-      
+
       if (Array.isArray(data)) {
         services.value = data
       } else if (data && typeof data === 'object' && 'results' in data) {
@@ -63,7 +63,7 @@ async function loadServices() {
         services.value = []
         console.warn('EventModal: Unexpected data format:', data)
       }
-      
+
       console.log('EventModal: Final services.value:', services.value)
       console.log('EventModal: Final services.value.length:', services.value.length)
     } catch (error: any) {
@@ -71,13 +71,13 @@ async function loadServices() {
       if (error.statusCode === 401 || error.status === 401) {
         console.log('EventModal: Got 401, attempting to refresh token...')
         const refreshed = await refreshAccessToken()
-        
+
         if (refreshed) {
           console.log('EventModal: Token refreshed, retrying request...')
           headers = getAuthHeaders()
-          
+
           try {
-            const retryData = await $fetch<Service[]>('/api/services', {
+            const retryData = await $fetch<Service[]>('/api/services/', {
               headers
             })
             
