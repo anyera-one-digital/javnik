@@ -50,9 +50,9 @@ const loadUserProfile = async () => {
   userError.value = null
   
   try {
-    const apiUrl = `/api/public/profile/${username.value}`
+    const apiUrl = `/api/public/profile/${username.value}/`
     console.log('Loading user profile from:', apiUrl)
-    
+
     const response = await $fetch<User>(apiUrl)
     publicUser.value = response
     console.log('User profile loaded:', response)

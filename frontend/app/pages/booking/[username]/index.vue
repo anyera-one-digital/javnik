@@ -85,7 +85,7 @@ const loadUserProfile = async () => {
   userError.value = null
   
   try {
-    const apiUrl = `/api/public/profile/${username.value}`
+    const apiUrl = `/api/public/profile/${username.value}/`
     const response = await $fetch<User>(apiUrl)
     publicUser.value = response
     
@@ -123,7 +123,7 @@ const loadServices = async () => {
   
   servicesPending.value = true
   try {
-    const servicesUrl = `/api/public/services/${username.value}`
+    const servicesUrl = `/api/public/services/${username.value}/`
     console.log('Loading services from:', servicesUrl)
     const response = await $fetch<Service[]>(servicesUrl)
     console.log('Services loaded:', response)
