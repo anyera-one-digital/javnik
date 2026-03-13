@@ -144,13 +144,13 @@ async function loadServices() {
 
 async function loadMembers() {
   if (!accessToken.value) return
-  
+
   try {
-    const token = accessToken.value.startsWith('Bearer ') 
-      ? accessToken.value 
+    const token = accessToken.value.startsWith('Bearer ')
+      ? accessToken.value
       : `Bearer ${accessToken.value}`
-    
-    members.value = await $fetch<Member[]>('/api/members', {
+
+    members.value = await $fetch<Member[]>('/api/members/', {
       headers: {
         Authorization: token
       }

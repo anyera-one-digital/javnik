@@ -173,16 +173,16 @@ async function loadAllEvents() {
   try {
     let headers = getAuthHeaders()
     if (!headers.Authorization) return
-    
+
     try {
-      const data = await $fetch<Event[]>('/api/events', { headers })
+      const data = await $fetch<Event[]>('/api/events/', { headers })
       allEvents.value = data || []
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-          const retryData = await $fetch<Event[]>('/api/events', { headers })
+          const retryData = await $fetch<Event[]>('/api/events/', { headers })
           allEvents.value = retryData || []
           return
         }
