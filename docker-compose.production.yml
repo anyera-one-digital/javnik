@@ -79,20 +79,20 @@ services:
     restart: unless-stopped
     command: celery -A bookly_api worker --loglevel=info --concurrency=2
 
-#  celery_beat:
-#    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
-#    container_name: javnik_celery_beat
-#    volumes:
-#      - ./backend/content:/app/content:ro
-#    env_file:
-#      - .env
-#    depends_on:
-#      - db
-#      - redis
-#    networks:
-#      - javnik_network
-#    restart: unless-stopped
-#    command: celery -A bookly_api beat --loglevel=info
+  celery_beat:
+    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
+    container_name: javnik_celery_beat
+    volumes:
+      - ./backend/content:/app/content:ro
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - javnik_network
+    restart: unless-stopped
+    command: celery -A bookly_api beat --loglevel=info
 
 networks:
   javnik_network:
