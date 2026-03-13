@@ -81,11 +81,11 @@ class ServiceImageSerializer(serializers.ModelSerializer):
 class ServiceSerializer(serializers.ModelSerializer):
     cover_image_url = serializers.SerializerMethodField()
     portfolio_images = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Service
         fields = '__all__'
-        read_only_fields = ('user', 'created_at', 'updated_at', 'cover_image_url', 'portfolio_images')
+        read_only_fields = ('user', 'created_at', 'updated_at', 'cover_image_url', 'portfolio_images', 'active')
         # Исключаем cover_image из автоматической сериализации, используем только cover_image_url
         extra_kwargs = {
             'cover_image': {'write_only': True, 'required': False}

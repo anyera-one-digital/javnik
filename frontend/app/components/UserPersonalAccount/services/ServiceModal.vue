@@ -110,7 +110,7 @@ watch(() => props.service, (service) => {
     state.name = service.name
     state.description = service.description || ''
     state.duration = service.duration
-    state.price = service.price
+    state.price = Math.round(Number(service.price))
     // Загружаем превью существующих изображений
     if (service.portfolio_images && service.portfolio_images.length > 0) {
       existingPortfolioImages.value = service.portfolio_images
@@ -293,8 +293,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     state.description = undefined
     state.duration = undefined
     state.price = undefined
-    coverImageFile.value = null
-    coverImagePreview.value = null
     portfolioImageFiles.value = []
     portfolioImagePreviews.value = []
     
