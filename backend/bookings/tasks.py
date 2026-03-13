@@ -340,3 +340,202 @@ def send_booking_pending_notification(booking_id, customer_email):
     except Exception as e:
         logger.error(f'Ошибка отправки уведомления: {e}')
         return {'status': 'failed', 'error': str(e)}
+
+
+@shared_task
+def send_booking_confirmed_notification(booking_id, customer_email):
+    """
+    Отправка уведомления клиенту о подтверждении бронирования.
+
+    Usage:
+        send_booking_confirmed_notification.delay(booking_id=1, customer_email='user@example.com')
+    """
+    from bookings.models import Booking
+
+    try:
+        booking = Booking.objects.select_related('service', 'customer', 'member').get(id=booking_id)
+        subject = f'Бронирование #{booking.id} подтверждено!'
+
+        service_name = booking.service.name if booking.service else (booking.event.name if booking.event else '—')
+        member_name = booking.member.name if booking.member else '—'
+
+        message = f'''
+Здравствуйте, {booking.customer.name}!
+
+Ваше бронирование подтверждено:
+
+Услуга: {service_name}
+Сотрудник: {member_name}
+Дата: {booking.date.strftime('%d.%m.%Y')}
+Время: {booking.start_time.strftime('%H:%M')} - {booking.end_time.strftime('%H:%M')}
+Длительность: {int((booking.end_time.hour * 60 + booking.end_time.minute) - (booking.start_time.hour * 60 + booking.start_time.minute))} мин.
+
+Статус: Подтверждено
+
+Ждём вас! Если у вас возникнут вопросы, пожалуйста, свяжитесь с нами.
+        '''
+
+        # HTML версия письма
+        html_message = f'''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background-color: #10B981; color: white; padding: 20px; text-align: center; }}
+        .content {{ padding: 20px; background-color: #f9f9f9; }}
+        .info-block {{ background-color: white; padding: 15px; margin: 15px 0; border-radius: 8px; }}
+        .info-row {{ margin: 10px 0; }}
+        .label {{ font-weight: bold; color: #555; }}
+        .footer {{ text-align: center; padding: 15px; font-size: 12px; color: #888; }}
+        .status {{ display: inline-block; padding: 5px 15px; background-color: #10B981; color: white; border-radius: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✓ Бронирование подтверждено</h1>
+        </div>
+        <div class="content">
+            <p>Здравствуйте, <strong>{booking.customer.name}</strong>!</p>
+            <p>Ваше бронирование подтверждено.</p>
+            
+            <div class="info-block">
+                <h3>Детали бронирования</h3>
+                <div class="info-row"><span class="label">Услуга:</span> {service_name}</div>
+                <div class="info-row"><span class="label">Сотрудник:</span> {member_name}</div>
+                <div class="info-row"><span class="label">Дата:</span> {booking.date.strftime('%d.%m.%Y')}</div>
+                <div class="info-row"><span class="label">Время:</span> {booking.start_time.strftime('%H:%M')} - {booking.end_time.strftime('%H:%M')}</div>
+                <div class="info-row"><span class="label">Длительность:</span> {int((booking.end_time.hour * 60 + booking.end_time.minute) - (booking.start_time.hour * 60 + booking.start_time.minute))} мин.</div>
+            </div>
+            
+            <div class="info-block">
+                <h3>Статус</h3>
+                <span class="status">✓ Подтверждено</span>
+            </div>
+            
+            <p style="margin-top: 20px;">Ждём вас! Если у вас возникнут вопросы, пожалуйста, свяжитесь с нами.</p>
+        </div>
+        <div class="footer">
+            <p>Это письмо отправлено автоматически. Пожалуйста, не отвечайте на него.</p>
+        </div>
+    </div>
+</body>
+</html>
+        '''
+
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[customer_email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f'Подтверждение бронирования #{booking_id} отправлено клиенту {customer_email}')
+        return {'status': 'success', 'booking_id': booking_id}
+    except Booking.DoesNotExist:
+        logger.error(f'Бронирование #{booking_id} не найдено')
+        return {'status': 'failed', 'error': 'Booking not found'}
+    except Exception as e:
+        logger.error(f'Ошибка отправки подтверждения: {e}')
+        return {'status': 'failed', 'error': str(e)}
+
+
+@shared_task
+def send_booking_rejected_notification(booking_id, customer_email):
+    """
+    Отправка уведомления клиенту об отклонении бронирования.
+
+    Usage:
+        send_booking_rejected_notification.delay(booking_id=1, customer_email='user@example.com')
+    """
+    from bookings.models import Booking
+
+    try:
+        booking = Booking.objects.select_related('service', 'customer').get(id=booking_id)
+        subject = f'Бронирование #{booking.id} отклонено'
+
+        service_name = booking.service.name if booking.service else (booking.event.name if booking.event else '—')
+
+        message = f'''
+Здравствуйте, {booking.customer.name}!
+
+К сожалению, ваше бронирование отклонено:
+
+Услуга: {service_name}
+Дата: {booking.date.strftime('%d.%m.%Y')}
+Время: {booking.start_time.strftime('%H:%M')}
+
+Статус: Отклонено
+
+Пожалуйста, выберите другое время или услугу. Приносим извинения за неудобства.
+        '''
+
+        # HTML версия письма
+        html_message = f'''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background-color: #EF4444; color: white; padding: 20px; text-align: center; }}
+        .content {{ padding: 20px; background-color: #f9f9f9; }}
+        .info-block {{ background-color: white; padding: 15px; margin: 15px 0; border-radius: 8px; }}
+        .info-row {{ margin: 10px 0; }}
+        .label {{ font-weight: bold; color: #555; }}
+        .footer {{ text-align: center; padding: 15px; font-size: 12px; color: #888; }}
+        .status {{ display: inline-block; padding: 5px 15px; background-color: #EF4444; color: white; border-radius: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✕ Бронирование отклонено</h1>
+        </div>
+        <div class="content">
+            <p>Здравствуйте, <strong>{booking.customer.name}</strong>!</p>
+            <p>К сожалению, ваше бронирование отклонено.</p>
+            
+            <div class="info-block">
+                <h3>Детали бронирования</h3>
+                <div class="info-row"><span class="label">Услуга:</span> {service_name}</div>
+                <div class="info-row"><span class="label">Дата:</span> {booking.date.strftime('%d.%m.%Y')}</div>
+                <div class="info-row"><span class="label">Время:</span> {booking.start_time.strftime('%H:%M')}</div>
+            </div>
+            
+            <div class="info-block">
+                <h3>Статус</h3>
+                <span class="status">✕ Отклонено</span>
+            </div>
+            
+            <p style="margin-top: 20px;">Пожалуйста, выберите другое время или услугу. Приносим извинения за неудобства.</p>
+        </div>
+        <div class="footer">
+            <p>Это письмо отправлено автоматически. Пожалуйста, не отвечайте на него.</p>
+        </div>
+    </div>
+</body>
+</html>
+        '''
+
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[customer_email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f'Уведомление об отклонении бронирования #{booking_id} отправлено клиенту {customer_email}')
+        return {'status': 'success', 'booking_id': booking_id}
+    except Booking.DoesNotExist:
+        logger.error(f'Бронирование #{booking_id} не найдено')
+        return {'status': 'failed', 'error': 'Booking not found'}
+    except Exception as e:
+        logger.error(f'Ошибка отправки уведомления: {e}')
+        return {'status': 'failed', 'error': str(e)}

@@ -20,8 +20,13 @@ from .serializers import (
     WorkScheduleSerializer,
     ReviewSerializer
 )
-from bookings.tasks import send_booking_confirmation_email, send_new_booking_notification_to_staff, \
-    send_booking_pending_notification
+from bookings.tasks import (
+    send_booking_confirmation_email,
+    send_new_booking_notification_to_staff,
+    send_booking_pending_notification,
+    send_booking_confirmed_notification,
+    send_booking_rejected_notification,
+)
 
 User = get_user_model()
 
@@ -584,11 +589,54 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    def perform_update(self, serializer):
+        """
+        Переопределяем для отправки email при изменении статуса
+        """
+        instance = serializer.instance
+        old_status = instance.status
+        new_status = serializer.validated_data.get('status', old_status)
+
+        # Сохраняем изменения
+        super().perform_update(serializer)
+
+        # Если статус изменён на 'confirmed', отправляем подтверждение клиенту
+        if old_status != new_status and new_status == 'confirmed':
+            try:
+                send_booking_confirmed_notification.delay(instance.id, instance.customer.email)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи подтверждения бронирования: {e}')
+
+        # Если статус изменён на 'cancelled', отправляем уведомление об отклонении
+        if old_status != new_status and new_status == 'cancelled':
+            try:
+                send_booking_rejected_notification.delay(instance.id, instance.customer.email)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи отклонения бронирования: {e}')
+
+    def perform_destroy(self, instance):
+        """
+        Переопределяем для отправки email при отклонении бронирования
+        """
+        old_status = instance.status
+        instance.status = 'cancelled'
+        instance.save()
+
+        # Отправляем уведомление об отклонении, если заявка была в ожидании
+        if old_status == 'pending':
+            try:
+                send_booking_rejected_notification.delay(instance.id, instance.customer.email)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи отклонения бронирования: {e}')
+
     def perform_create(self, serializer):
         # Этот метод больше не используется напрямую, но оставляем для совместимости
         booking = serializer.save(user=self.request.user)
-        
+
         # Если это бронирование на событие, увеличиваем счетчик забронированных мест
         if booking.event:
             booking.event.booked_slots += 1
