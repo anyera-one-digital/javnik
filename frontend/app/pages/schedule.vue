@@ -198,7 +198,18 @@ async function refreshBookings() {
   // Загружаем все бронирования для недельного режима
   await loadAllBookings()
   // Загружаем бронирования для текущего дня/недели
-  await loadBookings()
+  // Если viewMode !== 'day', используем уже загруженные allBookings
+  if (viewMode.value === 'day') {
+    await loadBookings()
+  } else {
+    // Фильтруем уже загруженные бронирования по датам
+    const startDate = format(weekStart.value, 'yyyy-MM-dd')
+    const endDate = format(weekEnd.value, 'yyyy-MM-dd')
+    bookings.value = allBookings.value.filter(b => {
+      const bookingDate = typeof b.date === 'string' ? b.date.split('T')[0] : b.date
+      return bookingDate >= startDate && bookingDate <= endDate
+    })
+  }
 }
 
 async function refreshEvents() {
