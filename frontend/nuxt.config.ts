@@ -53,19 +53,16 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2024-07-11',
 
-<<<<<<< HEAD:nuxt.config.ts
-=======
   nitro: {
     prerender: {
       routes: [
         '/'
       ],
-      crawlLinks: false, // Отключаем краулинг для избежания ошибок при сборке
-      failOnError: false // Не прерывать сборку при ошибках
+      crawlLinks: false,
+      failOnError: false
     }
   },
 
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/nuxt.config.ts
   eslint: {
     config: {
       stylistic: {

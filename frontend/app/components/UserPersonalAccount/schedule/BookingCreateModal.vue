@@ -145,12 +145,6 @@ async function loadServices() {
       const data = await $fetch<Service[]>('/api/services/', {
         headers
       })
-<<<<<<< HEAD:app/components/UserPersonalAccount/schedule/BookingCreateModal.vue
-      
-=======
-
-      // Убеждаемся, что data - это массив
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/components/UserPersonalAccount/schedule/BookingCreateModal.vue
       if (Array.isArray(data)) {
         services.value = onlyActiveServices(data)
       } else if (data && typeof data === 'object' && 'results' in data) {

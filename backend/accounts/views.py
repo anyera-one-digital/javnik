@@ -9,8 +9,10 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils.crypto import get_random_string
 from django.conf import settings
-<<<<<<< HEAD
+
+from bookings.tasks import send_email_verification_code
 from .account_deletion import can_delete_account, count_active_bookings, delete_user_account
+from .models import SpecialtyCategory
 from .serializers import (
     UserRegistrationSerializer,
     UserSerializer,
@@ -19,15 +21,8 @@ from .serializers import (
     DeleteAccountSerializer,
 )
 from .subscription import build_subscription_payload
-import hashlib
-=======
-
-from bookings.tasks import send_email_verification_code
-from .models import SpecialtyCategory
-from .serializers import UserRegistrationSerializer, UserSerializer, LoginSerializer
 
 logger = logging.getLogger(__name__)
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e
 
 User = get_user_model()
 

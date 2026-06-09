@@ -264,54 +264,21 @@ async function loadBookings() {
       headers = refreshHeaders()
       if (!headers.Authorization) return
     }
-
+    
     try {
-<<<<<<< HEAD:app/pages/schedule.vue
       const date = calendarViewMode.value === 'day' ? format(selectedDate.value, 'yyyy-MM-dd') : undefined
       const url = date ? `/api/bookings?date=${date}` : '/api/bookings'
       const data = await $fetch<unknown>(url, { headers })
       bookings.value = normalizeApiList<Booking>(data)
-=======
-      const date = viewMode.value === 'day' ? format(selectedDate.value, 'yyyy-MM-dd') : undefined
-      const url = date ? `/api/bookings/?date=${date}` : '/api/bookings/'
-      const data = await $fetch<any>(url, { headers })
-
-      // Обрабатываем разные форматы ответа
-      let bookingsArray: Booking[] = []
-
-      if (Array.isArray(data)) {
-        bookingsArray = data
-      } else if (data && typeof data === 'object') {
-        if (Array.isArray(data.results)) {
-          bookingsArray = data.results
-        } else if (Array.isArray(data.data)) {
-          bookingsArray = data.data
-        } else if (Array.isArray(data.bookings)) {
-          bookingsArray = data.bookings
-        } else if (data.id) {
-          // Один объект бронирования
-          bookingsArray = [data]
-        }
-      }
-
-      bookings.value = bookingsArray
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-<<<<<<< HEAD:app/pages/schedule.vue
           const date = calendarViewMode.value === 'day' ? format(selectedDate.value, 'yyyy-MM-dd') : undefined
           const url = date ? `/api/bookings?date=${date}` : '/api/bookings'
           const retryData = await $fetch<unknown>(url, { headers })
           bookings.value = normalizeApiList<Booking>(retryData)
-=======
-          const date = viewMode.value === 'day' ? format(selectedDate.value, 'yyyy-MM-dd') : undefined
-          const url = date ? `/api/bookings/?date=${date}` : '/api/bookings/'
-          const retryData = await $fetch<Booking[]>(url, { headers })
-          bookings.value = retryData || []
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
           return
         }
       }
@@ -328,16 +295,16 @@ async function loadServices() {
   try {
     let headers = getAuthHeaders()
     if (!headers.Authorization) return
-
+    
     try {
-      const data = await $fetch<Service[]>('/api/services/', { headers })
+      const data = await $fetch<Service[]>('/api/services', { headers })
       services.value = data || []
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-          const retryData = await $fetch<Service[]>('/api/services/', { headers })
+          const retryData = await $fetch<Service[]>('/api/services', { headers })
           services.value = retryData || []
           return
         }
@@ -359,9 +326,8 @@ async function loadAllBookings() {
       headers = refreshHeaders()
       if (!headers.Authorization) return
     }
-
+    
     try {
-<<<<<<< HEAD:app/pages/schedule.vue
       const params = new URLSearchParams()
       if (calendarViewMode.value === 'week') {
         params.set('start_date', format(weekStart.value, 'yyyy-MM-dd'))
@@ -371,35 +337,11 @@ async function loadAllBookings() {
       const url = query ? `/api/bookings?${query}` : '/api/bookings'
       const data = await $fetch<unknown>(url, { headers })
       allBookings.value = normalizeApiList<Booking>(data)
-=======
-      const data = await $fetch<any>('/api/bookings/', { headers })
-
-      // Обрабатываем разные форматы ответа
-      let bookingsArray: Booking[] = []
-
-      if (Array.isArray(data)) {
-        bookingsArray = data
-      } else if (data && typeof data === 'object') {
-        if (Array.isArray(data.results)) {
-          bookingsArray = data.results
-        } else if (Array.isArray(data.data)) {
-          bookingsArray = data.data
-        } else if (Array.isArray(data.bookings)) {
-          bookingsArray = data.bookings
-        } else if (data.id) {
-          // Один объект бронирования
-          bookingsArray = [data]
-        }
-      }
-
-      allBookings.value = bookingsArray
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-<<<<<<< HEAD:app/pages/schedule.vue
           const params = new URLSearchParams()
           if (calendarViewMode.value === 'week') {
             params.set('start_date', format(weekStart.value, 'yyyy-MM-dd'))
@@ -409,10 +351,6 @@ async function loadAllBookings() {
           const retryUrl = query ? `/api/bookings?${query}` : '/api/bookings'
           const retryData = await $fetch<unknown>(retryUrl, { headers })
           allBookings.value = normalizeApiList<Booking>(retryData)
-=======
-          const retryData = await $fetch<Booking[]>('/api/bookings/', { headers })
-          allBookings.value = retryData || []
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
           return
         }
       }
@@ -429,27 +367,17 @@ async function loadAllEvents() {
   try {
     let headers = getAuthHeaders()
     if (!headers.Authorization) return
-
+    
     try {
-<<<<<<< HEAD:app/pages/schedule.vue
       const data = await $fetch<unknown>('/api/events', { headers })
       allEvents.value = normalizeApiList<Event>(data)
-=======
-      const data = await $fetch<Event[]>('/api/events/', { headers })
-      allEvents.value = data || []
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed) {
           headers = getAuthHeaders()
-<<<<<<< HEAD:app/pages/schedule.vue
           const retryData = await $fetch<unknown>('/api/events', { headers })
           allEvents.value = normalizeApiList<Event>(retryData)
-=======
-          const retryData = await $fetch<Event[]>('/api/events/', { headers })
-          allEvents.value = retryData || []
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
           return
         }
       }
@@ -464,18 +392,7 @@ async function refreshBookings() {
   // Загружаем все бронирования для недельного режима
   await loadAllBookings()
   // Загружаем бронирования для текущего дня/недели
-  // Если viewMode !== 'day', используем уже загруженные allBookings
-  if (viewMode.value === 'day') {
-    await loadBookings()
-  } else {
-    // Фильтруем уже загруженные бронирования по датам
-    const startDate = format(weekStart.value, 'yyyy-MM-dd')
-    const endDate = format(weekEnd.value, 'yyyy-MM-dd')
-    bookings.value = allBookings.value.filter(b => {
-      const bookingDate = typeof b.date === 'string' ? b.date.split('T')[0] : b.date
-      return bookingDate >= startDate && bookingDate <= endDate
-    })
-  }
+  await loadBookings()
 }
 
 async function refreshEvents() {
@@ -752,77 +669,6 @@ const bookingsDates = computed(() => {
   return [...new Set(allBookings.value.filter(b => b && b.date).map(b => b.date))]
 })
 
-<<<<<<< HEAD:app/pages/schedule.vue
-=======
-// Для недельного вида
-const weekStart = computed(() => startOfWeek(selectedDate.value, { locale: ru }))
-const weekEnd = computed(() => endOfWeek(selectedDate.value, { locale: ru }))
-const weekDays = computed(() => eachDayOfInterval({ start: weekStart.value, end: weekEnd.value }))
-
-async function loadWorkSchedules() {
-  if (!process.client) return
-  
-  try {
-    const datesToLoad = viewMode.value === 'day' 
-      ? [selectedDate.value]
-      : weekDays.value
-    
-    if (!datesToLoad || datesToLoad.length === 0) return
-    
-    const startDate = format(datesToLoad[0], 'yyyy-MM-dd')
-    const endDate = format(datesToLoad[datesToLoad.length - 1], 'yyyy-MM-dd')
-    
-    const headers = getAuthHeaders()
-    if (!headers || !headers.Authorization) {
-      console.warn('No auth headers available for loading work schedules')
-      return
-    }
-
-    const response = await $fetch<WorkSchedule[]>('/api/schedule/', {
-      query: {
-        start_date: startDate,
-        end_date: endDate
-      },
-      headers
-    })
-    
-    // Очищаем графики только для текущего диапазона дат
-    datesToLoad.forEach(date => {
-      const dateStr = format(date, 'yyyy-MM-dd')
-      workSchedules.value.delete(dateStr)
-    })
-    
-    // Загружаем новые графики
-    if (Array.isArray(response)) {
-      response.forEach(schedule => {
-        if (schedule && schedule.date) {
-          workSchedules.value.set(schedule.date, schedule)
-        }
-      })
-    }
-  } catch (error) {
-    console.error('Error loading work schedules:', error)
-    // Не очищаем существующие графики при ошибке, чтобы не потерять данные
-  }
-}
-
-// Загружаем график работы при изменении даты или режима просмотра
-watch([selectedDate, viewMode], () => {
-  if (process.client) {
-    nextTick(() => {
-      loadWorkSchedules()
-    })
-  }
-})
-
-// Загружаем график работы при монтировании компонента
-onMounted(() => {
-  nextTick(() => {
-    loadWorkSchedules()
-  })
-})
-
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/schedule.vue
 // Для дневного вида - мини-календарь дней недели
 const dayViewWeekDays = computed(() => {
   const start = startOfWeek(selectedDate.value, { locale: ru, weekStartsOn: 1 })

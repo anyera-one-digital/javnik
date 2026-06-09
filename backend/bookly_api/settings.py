@@ -207,7 +207,6 @@ CORS_ALLOWED_ORIGINS = config(
 CORS_ALLOW_CREDENTIALS = config('CORS_ALLOW_CREDENTIALS', default=True, cast=bool)
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Разрешить все origins в режиме разработки
 
-<<<<<<< HEAD
 # T‑Bank (Т‑Касса) — интернет‑эквайринг подписки Pro
 # Документация: https://developer.tbank.ru/eacq/api
 TBANK_TERMINAL_KEY = config('TBANK_TERMINAL_KEY', default='')
@@ -221,7 +220,7 @@ FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:4000')
 # Публичный URL API для webhook (если пусто — TBANK_NOTIFICATION_URL обязателен)
 API_PUBLIC_BASE_URL = config('API_PUBLIC_BASE_URL', default='')
 TBANK_NOTIFICATION_URL = config('TBANK_NOTIFICATION_URL', default='')
-=======
+
 # Redis settings
 REDIS_URL = config('REDIS_URL', default='redis://redis:6379/0')
 
@@ -287,4 +286,3 @@ LOGGING = {
         },
     },
 }
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e

@@ -43,17 +43,10 @@ async function loadServices() {
     }
 
     try {
-      const data = await $fetch<Service[]>('/api/services/', {
+      const data = await $fetch<Service[]>('/api/services', {
         headers
       })
 
-<<<<<<< HEAD:app/components/UserPersonalAccount/schedule/EventModal.vue
-=======
-      console.log('EventModal: Services loaded:', data)
-      console.log('EventModal: Services count:', data?.length || 0)
-      console.log('EventModal: Services type:', Array.isArray(data) ? 'array' : typeof data)
-
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/components/UserPersonalAccount/schedule/EventModal.vue
       if (Array.isArray(data)) {
         services.value = onlyActiveServices(data)
       } else if (data && typeof data === 'object' && 'results' in data) {
@@ -61,21 +54,15 @@ async function loadServices() {
       } else {
         services.value = []
       }
-<<<<<<< HEAD:app/components/UserPersonalAccount/schedule/EventModal.vue
-=======
-
-      console.log('EventModal: Final services.value:', services.value)
-      console.log('EventModal: Final services.value.length:', services.value.length)
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/components/UserPersonalAccount/schedule/EventModal.vue
     } catch (error: any) {
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
 
         if (refreshed) {
           headers = getAuthHeaders()
-
+          
           try {
-            const retryData = await $fetch<Service[]>('/api/services/', {
+            const retryData = await $fetch<Service[]>('/api/services', {
               headers
             })
             
@@ -244,23 +231,8 @@ async function onSubmit() {
       body.price = Number(form.price)
     }
 
-<<<<<<< HEAD:app/components/UserPersonalAccount/schedule/EventModal.vue
     if (props.event) {
       await $fetch('/api/events', {
-=======
-    console.log('EventModal: Sending event data:', JSON.stringify(body, null, 2))
-    console.log('EventModal: Form state:', {
-      serviceId: form.serviceId,
-      price: form.price,
-      duration: form.duration
-    })
-
-    console.log('EventModal: Headers:', headers.Authorization ? 'Present' : 'Missing')
-
-    if (props.event) {
-      console.log('EventModal: Updating event:', props.event.id)
-      const response = await $fetch('/api/events/', {
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/components/UserPersonalAccount/schedule/EventModal.vue
         method: 'PATCH',
         headers,
         body: {
@@ -269,17 +241,7 @@ async function onSubmit() {
         }
       })
     } else {
-<<<<<<< HEAD:app/components/UserPersonalAccount/schedule/EventModal.vue
       await $fetch('/api/events', {
-=======
-      console.log('EventModal: Creating new event')
-      console.log('EventModal: Request URL: /api/events/')
-      console.log('EventModal: Request method: POST')
-      console.log('EventModal: Request headers:', headers)
-      console.log('EventModal: Request body:', body)
-
-      const response = await $fetch('/api/events/', {
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/components/UserPersonalAccount/schedule/EventModal.vue
         method: 'POST',
         headers,
         body

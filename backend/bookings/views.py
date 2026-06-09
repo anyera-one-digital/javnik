@@ -6,7 +6,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
-<<<<<<< HEAD
 from accounts.subscription import (
     check_booking_limit,
     check_customer_limit,
@@ -17,8 +16,7 @@ from django.db.models import Count, Q, Max
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from datetime import datetime, timedelta, date as dt_date
-import logging
+from datetime import date as dt_date
 
 from .models import Customer, Service, ServiceImage, Event, Booking, WorkSchedule, Review
 from .effective_schedule import get_effective_schedule_for_validation, merge_schedule_range_for_public_api
@@ -30,13 +28,6 @@ from .analytics import (
     revenue_chart,
     services_breakdown,
 )
-=======
-from django.db import models
-from django.conf import settings
-from django.contrib.auth import get_user_model
-
-from .models import Customer, Service, ServiceImage, Member, Event, Booking, WorkSchedule, Review
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e
 from .serializers import (
     CustomerSerializer,
     ServiceSerializer,

@@ -19,19 +19,6 @@ const colorMode = useColorMode()
 const { toggle } = usePublicPageColorMode()
 const toast = useToast()
 
-// Определяем базовый URL для API
-const getApiUrl = () => {
-  if (process.server) {
-    const config = useRuntimeConfig()
-    return config.apiBase || 'http://backend:8000'
-  }
-  if (process.env.NODE_ENV === 'production') {
-    return ''
-  }
-  const config = useRuntimeConfig()
-  return config.public.apiBase || 'http://localhost:8000'
-}
-
 const username = computed(() => route.params.username as string)
 
 // Проверяем, находимся ли мы на странице календаря
@@ -84,14 +71,14 @@ const loadUserProfile = async () => {
   userError.value = null
   
   try {
-    const apiUrl = `/api/public/profile/${username.value}/`
+    const apiUrl = `/api/public/profile/${username.value}`
     const response = await $fetch<User>(apiUrl)
     publicUser.value = response
     
     // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
       const config = useRuntimeConfig()
-      const baseUrl = getApiUrl()
+      const baseUrl = config.public.apiBase || 'http://localhost:8000'
       
       if (response.avatar_url.includes('://backend:') || response.avatar_url.includes('://backend/')) {
         const urlPath = response.avatar_url.replace(/^https?:\/\/[^\/]+/, '')
@@ -122,31 +109,7 @@ const loadServices = async () => {
   
   servicesPending.value = true
   try {
-<<<<<<< HEAD:app/pages/booking/[username]/index.vue
     const response = await $fetch<Service[]>(`/api/public/services/${username.value}`)
-=======
-    const servicesUrl = `/api/public/services/${username.value}/`
-    console.log('Loading services from:', servicesUrl)
-    const response = await $fetch<Service[]>(servicesUrl)
-    console.log('Services loaded:', response)
-    console.log('Services count:', response?.length || 0)
-    console.log('Services with images:', response?.filter(s => s.cover_image_url).length || 0)
-    console.log('Services without images:', response?.filter(s => !s.cover_image_url).length || 0)
-    
-    // Логируем каждую услугу
-    if (response && Array.isArray(response)) {
-      response.forEach((service, index) => {
-        console.log(`Service [${index}]:`, {
-          id: service.id,
-          name: service.name,
-          has_cover_image: !!service.cover_image_url,
-          cover_image_url: service.cover_image_url,
-          portfolio_count: service.portfolio_images?.length || 0
-        })
-      })
-    }
-    
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/booking/[username]/index.vue
     services.value = response || []
   } catch (error: any) {
     console.error('Error loading services:', error)
@@ -266,7 +229,7 @@ const loadReviews = async () => {
   if (!username.value) return
   reviewsPending.value = true
   try {
-    const response = await $fetch<Review[]>(`/api/public/reviews/${username.value}/`)
+    const response = await $fetch<Review[]>(`/api/public/reviews/${username.value}`)
     reviews.value = Array.isArray(response) ? response : []
   } catch {
     reviews.value = []
@@ -529,7 +492,7 @@ async function submitBooking() {
   isBookingSubmitting.value = true
   try {
     const config = useRuntimeConfig()
-    const apiBase = getApiUrl()
+    const apiBase = config.public.apiBase || 'http://localhost:8000'
     const bookingUrl = `${apiBase}/api/public/bookings/${username.value}/create/`
 
     await $fetch(bookingUrl, {

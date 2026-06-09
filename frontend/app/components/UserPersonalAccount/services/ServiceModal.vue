@@ -268,11 +268,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       })
     } else {
       // Создание новой услуги
-<<<<<<< HEAD:app/components/UserPersonalAccount/services/ServiceModal.vue
-      await $fetch<Service>('/api/services', {
-=======
-      const createdService = await $fetch<Service>('/api/services/', {
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/components/UserPersonalAccount/services/ServiceModal.vue
+      await $fetch<Service>('/api/services/', {
         method: 'POST',
         headers: {
           Authorization: authToken

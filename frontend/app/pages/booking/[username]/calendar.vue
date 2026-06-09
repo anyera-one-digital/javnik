@@ -18,19 +18,6 @@ const config = useRuntimeConfig()
 const colorMode = useColorMode()
 const toast = useToast()
 
-// Определяем базовый URL для API
-const getApiUrl = () => {
-  if (process.server) {
-    const config = useRuntimeConfig()
-    return config.apiBase || 'http://backend:8000'
-  }
-  if (process.env.NODE_ENV === 'production') {
-    return ''
-  }
-  const config = useRuntimeConfig()
-  return config.public.apiBase || 'http://localhost:8000'
-}
-
 const username = computed(() => route.params.username as string)
 
 // Состояния для загрузки данных
@@ -51,7 +38,6 @@ const loadUserProfile = async () => {
   userError.value = null
   
   try {
-<<<<<<< HEAD:app/pages/booking/[username]/calendar.vue
     const response = await $fetch<User>(`/api/public/profile/${username.value}`)
 
     if (response.show_public_schedule === false) {
@@ -59,18 +45,12 @@ const loadUserProfile = async () => {
       return
     }
 
-=======
-    const apiUrl = `/api/public/profile/${username.value}/`
-    console.log('Loading user profile from:', apiUrl)
-
-    const response = await $fetch<User>(apiUrl)
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/booking/[username]/calendar.vue
     publicUser.value = response
 
     // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
       const config = useRuntimeConfig()
-      const baseUrl = getApiUrl()
+      const baseUrl = config.public.apiBase || 'http://localhost:8000'
       
       // Если URL содержит внутренний хост backend, заменяем на localhost
       if (response.avatar_url.includes('://backend:') || response.avatar_url.includes('://backend/')) {

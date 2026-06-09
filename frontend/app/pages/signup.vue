@@ -21,24 +21,7 @@ const router = useRouter()
 const step = ref(1)
 const pendingEmail = ref('')
 
-<<<<<<< HEAD:app/pages/signup.vue
 // Шаг 1 — email, имя, согласия
-=======
-// Определяем базовый URL для API
-const getApiUrl = () => {
-  if (process.server) {
-    const config = useRuntimeConfig()
-    return config.apiBase || 'http://backend:8000'
-  }
-  if (process.env.NODE_ENV === 'production') {
-    return ''
-  }
-  const config = useRuntimeConfig()
-  return config.public.apiBase || 'http://localhost:8000'
-}
-
-// Шаг 1
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/signup.vue
 const step1Loading = ref(false)
 const step1Schema = z.object({
   email: z.string().email('Неверный формат электронной почты'),
@@ -110,7 +93,7 @@ onMounted(async () => {
   specialtiesLoading.value = true
   try {
     const data = await $fetch<{ id: number; name: string; order: number; specialties: { id: number; name: string; order: number }[] }[]>(
-      `${getApiUrl()}/api/public/specialties/`
+      `${config.public.apiBase}/api/public/specialties/`
     )
     const groups = data.map(cat =>
       cat.specialties.map(s => ({ label: s.name, value: s.id }))

@@ -43,35 +43,13 @@ async function loadServices() {
   if (!accessToken.value) return
 
   try {
-<<<<<<< HEAD:app/pages/services.vue
     let token = accessToken.value.replace(/^Bearer\s+/i, '')
     token = `Bearer ${token}`
 
-    const response = await $fetch<any>('/api/services', {
+    const response = await $fetch<any>('/api/services/', {
       headers: { Authorization: token }
     })
 
-=======
-    // Убеждаемся, что токен не содержит двойной Bearer
-    let token = accessToken.value
-    if (token) {
-      // Убираем Bearer если он уже есть
-      token = token.replace(/^Bearer\s+/i, '')
-      // Добавляем Bearer один раз
-      token = `Bearer ${token}`
-    }
-
-    console.log('Loading services with token:', token ? token.substring(0, 30) + '...' : 'No token')
-
-    const response = await $fetch<any>('/api/services/', {
-      headers: {
-        Authorization: token
-      }
-    })
-
-    // Убеждаемся, что response - это массив
-    let servicesArray: Service[] = []
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/services.vue
     if (Array.isArray(response)) {
       services.value = response
     } else if (response && typeof response === 'object' && 'results' in response) {
@@ -79,15 +57,6 @@ async function loadServices() {
     } else {
       services.value = []
     }
-<<<<<<< HEAD:app/pages/services.vue
-=======
-
-    console.log('Services loaded successfully:', servicesArray)
-    console.log('Services count:', servicesArray.length)
-    console.log('Response type:', Array.isArray(response) ? 'array' : typeof response)
-    
-    services.value = servicesArray
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/services.vue
   } catch (error: any) {
     const statusCode = error.statusCode || error.status || 500
     const errorData = error.data || error.response?.data
@@ -118,32 +87,6 @@ async function loadServices() {
   }
 }
 
-<<<<<<< HEAD:app/pages/services.vue
-=======
-async function loadMembers() {
-  if (!accessToken.value) return
-
-  try {
-    const token = accessToken.value.startsWith('Bearer ')
-      ? accessToken.value
-      : `Bearer ${accessToken.value}`
-
-    members.value = await $fetch<Member[]>('/api/members/', {
-      headers: {
-        Authorization: token
-      }
-    })
-  } catch (error: any) {
-    console.error('Error loading members:', error)
-    if (error.statusCode === 401) {
-      console.warn('Unauthorized when loading members')
-    }
-    members.value = []
-  }
-}
-
-// Загружаем данные при монтировании и при изменении токена
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/app/pages/services.vue
 onMounted(async () => {
   if (process.client && !accessToken.value) {
     const storedToken = localStorage.getItem('auth.accessToken')
