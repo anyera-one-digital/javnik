@@ -8,17 +8,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - javnik_network
-    ports:
-<<<<<<< HEAD
-      - "5432:5432"
-    healthcheck:
-      # Без -d pg_isready подключается к БД с именем пользователя (bookly_user) — её нет, только bookly_db
-      test: ["CMD-SHELL", "pg_isready -U bookly_user -d bookly_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-=======
-      - "5430:5432"
+    restart: unless-stopped
 
   redis:
     image: redis:8.6-alpine
@@ -27,12 +17,10 @@ services:
       - redis_data:/data
     networks:
       - javnik_network
->>>>>>> b649f276761559e347670f427cc77d7ba61bb11e
+    restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
     container_name: javnik_backend
     volumes:
       - ./backend/content:/app/content:ro
@@ -48,9 +36,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ${DOCKER_REGISTRY_URL}/javnik-frontend:latest
     container_name: javnik_frontend
     env_file:
       - .env
@@ -64,7 +50,7 @@ services:
     image: nginx:alpine
     container_name: javnik_nginx
     ports:
-      - "8765:80"
+      - "8001:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - static_volume:/app/staticfiles:ro
@@ -77,9 +63,7 @@ services:
     restart: unless-stopped
 
   celery_worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
     container_name: javnik_celery_worker
     volumes:
       - ./backend/content:/app/content:ro
@@ -96,9 +80,7 @@ services:
     command: celery -A bookly_api worker --loglevel=info --concurrency=2
 
   celery_beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${DOCKER_REGISTRY_URL}/javnik-backend:latest
     container_name: javnik_celery_beat
     volumes:
       - ./backend/content:/app/content:ro
@@ -111,24 +93,6 @@ services:
       - javnik_network
     restart: unless-stopped
     command: celery -A bookly_api beat --loglevel=info
-
-  # Flower (мониторинг Celery)
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: javnik_flower
-    env_file:
-      - .env
-    depends_on:
-      - redis
-      - celery_worker
-    networks:
-      - javnik_network
-    restart: unless-stopped
-    command: celery -A bookly_api flower --port=5555
-    ports:
-      - "5555:5555"
 
 networks:
   javnik_network:

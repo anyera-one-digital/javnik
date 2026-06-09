@@ -1,0 +1,104 @@
+// https://nuxt.com/docs/api/configuration/nuxt-config
+export default defineNuxtConfig({
+  modules: [
+    '@nuxt/eslint',
+    '@nuxt/image',
+    '@nuxt/ui',
+    '@nuxt/content',
+    '@vueuse/nuxt'
+  ],
+
+  devtools: {
+    enabled: true
+  },
+
+  devServer: {
+    port: 4000,
+    host: '0.0.0.0'
+  },
+
+  runtimeConfig: {
+    // Приватная конфигурация для сервера (может использовать backend:8000 внутри Docker)
+    apiBase: process.env.API_BASE_URL || 'http://localhost:8000',
+    // Публичная конфигурация для клиента (браузер)
+    // Для production: пустая строка (относительные пути)
+    // Для development: http://localhost:8000
+    public: {
+      apiBase: process.env.NODE_ENV === 'production' ? '' : (process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8000')
+    }
+  },
+
+  css: ['~/assets/css/main.css'],
+
+  routeRules: {
+    '/api/**': {
+      cors: true
+    },
+    // Публичные страницы сайта (без prerender — иначе устаревший HTML ломает гидрацию)
+    '/': { ssr: true },
+    '/login': { prerender: false },
+    '/signup': { prerender: false },
+    // Публичный календарь (по username)
+    '/booking/**': { ssr: false },
+    // Защищенные страницы приложения (требуют авторизации)
+    '/schedule': { ssr: false },
+    '/dashboard': { ssr: false },
+    '/customers': { ssr: false },
+    '/services': { ssr: false },
+    '/settings/**': { ssr: false },
+    '/profile': { ssr: false },
+    '/payment': { ssr: false },
+    '/payment/**': { ssr: false }
+  },
+
+  compatibilityDate: '2024-07-11',
+
+<<<<<<< HEAD:nuxt.config.ts
+=======
+  nitro: {
+    prerender: {
+      routes: [
+        '/'
+      ],
+      crawlLinks: false, // Отключаем краулинг для избежания ошибок при сборке
+      failOnError: false // Не прерывать сборку при ошибках
+    }
+  },
+
+>>>>>>> b649f276761559e347670f427cc77d7ba61bb11e:frontend/nuxt.config.ts
+  eslint: {
+    config: {
+      stylistic: {
+        commaDangle: 'never',
+        braceStyle: '1tbs'
+      }
+    }
+  },
+
+  vite: {
+    optimizeDeps: {
+      include: ['date-fns', '@unovis/vue', '@unovis/ts', 'vue']
+    },
+    resolve: {
+      dedupe: ['vue', '@vue/runtime-core']
+    },
+    server: {
+      hmr: {
+        timeout: 120000 // 2 минуты вместо 60 секунд
+      }
+    }
+  },
+
+  // Отключаем автоматическую загрузку шрифтов из внешних источников
+  fonts: {
+    providers: {
+      fontsource: false,
+      fontshare: false
+    }
+  },
+
+  // Экспериментальные настройки для SSR
+  experimental: {
+    payloadExtraction: false
+  }
+})

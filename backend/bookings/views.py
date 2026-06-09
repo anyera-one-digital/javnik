@@ -1,8 +1,12 @@
+import logging
+from datetime import datetime, timedelta
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
+<<<<<<< HEAD
 from accounts.subscription import (
     check_booking_limit,
     check_customer_limit,
@@ -26,6 +30,13 @@ from .analytics import (
     revenue_chart,
     services_breakdown,
 )
+=======
+from django.db import models
+from django.conf import settings
+from django.contrib.auth import get_user_model
+
+from .models import Customer, Service, ServiceImage, Member, Event, Booking, WorkSchedule, Review
+>>>>>>> b649f276761559e347670f427cc77d7ba61bb11e
 from .serializers import (
     CustomerSerializer,
     ServiceSerializer,
@@ -33,6 +44,13 @@ from .serializers import (
     BookingSerializer,
     WorkScheduleSerializer,
     ReviewSerializer
+)
+from bookings.tasks import (
+    send_booking_confirmation_email,
+    send_new_booking_notification_to_staff,
+    send_booking_pending_notification,
+    send_booking_confirmed_notification,
+    send_booking_rejected_notification,
 )
 
 User = get_user_model()
@@ -522,20 +540,73 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         if serializer.is_valid():
             booking = serializer.save(user=request.user)
-            
+
             # Если это бронирование на событие, увеличиваем счетчик забронированных мест
             if booking.event:
                 booking.event.booked_slots += 1
                 booking.event.save()
-            
+
+            # Отправляем подтверждение бронирования через Celery
+            try:
+                send_booking_confirmation_email.delay(
+                    booking_id=booking.id,
+                    customer_email=booking.customer.email
+                )
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи Celery: {e}')
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    def perform_update(self, serializer):
+        """
+        Переопределяем для отправки email при изменении статуса
+        """
+        instance = serializer.instance
+        old_status = instance.status
+        new_status = serializer.validated_data.get('status', old_status)
+
+        # Сохраняем изменения
+        super().perform_update(serializer)
+
+        # Если статус изменён на 'confirmed', отправляем подтверждение клиенту
+        if old_status != new_status and new_status == 'confirmed':
+            try:
+                send_booking_confirmed_notification.delay(instance.id, instance.customer.email)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи подтверждения бронирования: {e}')
+
+        # Если статус изменён на 'cancelled', отправляем уведомление об отклонении
+        if old_status != new_status and new_status == 'cancelled':
+            try:
+                send_booking_rejected_notification.delay(instance.id, instance.customer.email)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи отклонения бронирования: {e}')
+
+    def perform_destroy(self, instance):
+        """
+        Переопределяем для отправки email при отклонении бронирования
+        """
+        old_status = instance.status
+        instance.status = 'cancelled'
+        instance.save()
+
+        # Отправляем уведомление об отклонении, если заявка была в ожидании
+        if old_status == 'pending':
+            try:
+                send_booking_rejected_notification.delay(instance.id, instance.customer.email)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка отправки задачи отклонения бронирования: {e}')
+
     def perform_create(self, serializer):
         # Этот метод больше не используется напрямую, но оставляем для совместимости
         booking = serializer.save(user=self.request.user)
-        
+
         # Если это бронирование на событие, увеличиваем счетчик забронированных мест
         if booking.event:
             booking.event.booked_slots += 1
@@ -938,11 +1009,15 @@ def public_booking_create_view(request, username):
     if event:
         event.booked_slots += 1
         event.save()
-    
+
+    send_new_booking_notification_to_staff.delay(booking.id)
+    send_booking_pending_notification.delay(booking.id, customer_email)
+
     serializer = BookingSerializer(booking)
+
     return Response({
         'booking': serializer.data,
-        'message': 'Бронирование успешно создано.'
+        'message': 'Заявка на бронирование создана и ожидает подтверждения.'
     }, status=status.HTTP_201_CREATED)
 
 
