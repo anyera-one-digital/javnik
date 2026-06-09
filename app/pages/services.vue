@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Service, Member } from '~/types'
+import type { Service } from '~/types'
 import { h, resolveComponent } from 'vue'
 import ServicesServiceModal from '~/components/UserPersonalAccount/services/ServiceModal.vue'
+import { formatDurationMinutes } from '~/utils/formatDuration'
 import ServicesDeleteServiceModal from '~/components/UserPersonalAccount/services/DeleteServiceModal.vue'
 
 definePageMeta({
@@ -13,123 +14,67 @@ definePageMeta({
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
-const UCheckbox = resolveComponent('UCheckbox')
+const USwitch = resolveComponent('USwitch')
 
 const toast = useToast()
 const { accessToken } = useAuth()
 
+const togglingServiceIds = ref<Set<number>>(new Set())
+
 // Используем $fetch для запросов с токеном авторизации
 const services = ref<Service[]>([])
-const members = ref<Member[]>([])
+
+function extractApiErrorMessage(errorData: unknown, fallback: string): string {
+  if (!errorData) return fallback
+  if (typeof errorData === 'string') return errorData
+  if (typeof errorData !== 'object') return fallback
+  const data = errorData as Record<string, unknown>
+  if (data.detail) return String(data.detail)
+  if (data.message) return String(data.message)
+  if (data.error) return String(data.error)
+  const fields = Object.keys(data).map((key) => {
+    const value = data[key]
+    return `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`
+  })
+  return fields.join('\n') || fallback
+}
 
 async function loadServices() {
-  if (!accessToken.value) {
-    console.warn('No access token available for loading services')
-    return
-  }
-  
+  if (!accessToken.value) return
+
   try {
-    // Убеждаемся, что токен не содержит двойной Bearer
-    let token = accessToken.value
-    if (token) {
-      // Убираем Bearer если он уже есть
-      token = token.replace(/^Bearer\s+/i, '')
-      // Добавляем Bearer один раз
-      token = `Bearer ${token}`
-    }
-    
-    console.log('Loading services with token:', token ? token.substring(0, 30) + '...' : 'No token')
-    
+    let token = accessToken.value.replace(/^Bearer\s+/i, '')
+    token = `Bearer ${token}`
+
     const response = await $fetch<any>('/api/services', {
-      headers: {
-        Authorization: token
-      }
+      headers: { Authorization: token }
     })
-    
-    // Убеждаемся, что response - это массив
-    let servicesArray: Service[] = []
+
     if (Array.isArray(response)) {
-      servicesArray = response
+      services.value = response
     } else if (response && typeof response === 'object' && 'results' in response) {
-      // Если это пагинированный ответ Django REST Framework
-      servicesArray = response.results || []
+      services.value = response.results || []
+    } else {
+      services.value = []
     }
-    
-    console.log('Services loaded successfully:', servicesArray)
-    console.log('Services count:', servicesArray.length)
-    console.log('Response type:', Array.isArray(response) ? 'array' : typeof response)
-    
-    services.value = servicesArray
   } catch (error: any) {
-    console.error('Error loading services:', error)
-    console.error('Error status:', error.statusCode || error.status)
-    console.error('Error details:', error.data)
-    console.error('Error details (stringified):', JSON.stringify(error.data, null, 2))
-    console.error('Error response:', error.response)
-    console.error('Error response data:', error.response?.data)
-    console.error('Error message:', error.message)
-    console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
-    
-    // Проверяем разные типы ошибок
     const statusCode = error.statusCode || error.status || 500
-    
+    const errorData = error.data || error.response?.data
+    console.error('Error loading services:', statusCode, errorData)
+
     if (statusCode === 401) {
       toast.add({
         title: 'Ошибка авторизации',
         description: 'Токен авторизации истек или недействителен. Пожалуйста, войдите в систему заново.',
         color: 'error'
       })
-      // Перенаправляем на страницу входа
       await navigateTo('/login')
-      } else if (statusCode === 400) {
-      let errorMessage = 'Неверный формат запроса'
-      
-      // Пытаемся извлечь детали ошибки
-      const errorData = error.data || error.response?.data
-      
-      console.log('Full error object:', error)
-      console.log('Error data:', errorData)
-      console.log('Error data (stringified):', JSON.stringify(errorData, null, 2))
-      console.log('Error data type:', typeof errorData)
-      console.log('Error data keys:', errorData ? Object.keys(errorData) : 'no keys')
-      
-      if (errorData) {
-        if (typeof errorData === 'object') {
-          // Проверяем различные поля ошибки
-          if (errorData.detail) {
-            errorMessage = String(errorData.detail)
-          } else if (errorData.message) {
-            errorMessage = String(errorData.message)
-          } else if (errorData.error) {
-            errorMessage = String(errorData.error)
-          } else {
-            // Показываем все поля объекта для отладки
-            const errorFields = Object.keys(errorData).map(key => {
-              const value = errorData[key]
-              return `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`
-            }).join('\n')
-            errorMessage = errorFields || JSON.stringify(errorData, null, 2)
-          }
-        } else if (typeof errorData === 'string') {
-          errorMessage = errorData
-        }
-      } else if (error.message) {
-        errorMessage = error.message
-      }
-      
+    } else if (statusCode === 400) {
       toast.add({
-        title: 'Ошибка запроса (400)',
-        description: errorMessage,
+        title: 'Ошибка запроса',
+        description: extractApiErrorMessage(errorData, error.message || 'Неверный формат запроса'),
         color: 'error',
         timeout: 15000
-      })
-      
-      // Также выводим в консоль для отладки
-      console.error('400 Bad Request details:', {
-        error: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
-        errorData: JSON.stringify(errorData, null, 2),
-        errorMessage,
-        errorKeys: errorData ? Object.keys(errorData) : []
       })
     } else {
       toast.add({
@@ -142,58 +87,27 @@ async function loadServices() {
   }
 }
 
-async function loadMembers() {
-  if (!accessToken.value) return
-  
-  try {
-    const token = accessToken.value.startsWith('Bearer ') 
-      ? accessToken.value 
-      : `Bearer ${accessToken.value}`
-    
-    members.value = await $fetch<Member[]>('/api/members', {
-      headers: {
-        Authorization: token
-      }
-    })
-  } catch (error: any) {
-    console.error('Error loading members:', error)
-    if (error.statusCode === 401) {
-      console.warn('Unauthorized when loading members')
-    }
-    members.value = []
-  }
-}
-
-// Загружаем данные при монтировании и при изменении токена
 onMounted(async () => {
-  // Убеждаемся, что токен загружен из localStorage
   if (process.client && !accessToken.value) {
     const storedToken = localStorage.getItem('auth.accessToken')
     if (storedToken) {
       accessToken.value = storedToken
     }
   }
-  
+
   if (accessToken.value) {
-    await Promise.all([loadServices(), loadMembers()])
+    await loadServices()
   }
 })
 
 watch(accessToken, async (token) => {
   if (token) {
-    await Promise.all([loadServices(), loadMembers()])
+    await loadServices()
   }
 })
 
 async function refreshServices() {
-  console.log('Refreshing services list...')
   await loadServices()
-  console.log('Services list refreshed, count:', services.value.length)
-}
-
-function getMemberName(memberId: number): string {
-  const index = memberId - 1
-  return members.value[index]?.name || `Сотрудник #${memberId}`
 }
 
 const editingService = ref<Service | null>(null)
@@ -252,6 +166,61 @@ function deleteService(service: Service) {
   deletingService.value = service
 }
 
+function authHeader() {
+  if (!accessToken.value) return null
+  const token = accessToken.value.replace(/^Bearer\s+/i, '')
+  return `Bearer ${token}`
+}
+
+async function toggleServiceActive(service: Service, active: boolean) {
+  if (togglingServiceIds.value.has(service.id)) return
+
+  const previous = service.active !== false
+  const nextIds = new Set(togglingServiceIds.value)
+  nextIds.add(service.id)
+  togglingServiceIds.value = nextIds
+
+  const index = services.value.findIndex(item => item.id === service.id)
+  if (index !== -1) {
+    services.value[index] = { ...services.value[index], active }
+  }
+
+  const authorization = authHeader()
+  if (!authorization) {
+    if (index !== -1) {
+      services.value[index] = { ...services.value[index], active: previous }
+    }
+    togglingServiceIds.value = new Set([...togglingServiceIds.value].filter(id => id !== service.id))
+    return
+  }
+
+  try {
+    await $fetch(`/api/services/${service.id}`, {
+      method: 'PATCH',
+      headers: { Authorization: authorization },
+      body: { active }
+    })
+    toast.add({
+      title: active ? 'Услуга включена' : 'Услуга отключена',
+      description: active
+        ? `«${service.name}» снова доступна для записи`
+        : `«${service.name}» скрыта из записи до повторного включения`,
+      color: 'success'
+    })
+  } catch (error: any) {
+    if (index !== -1) {
+      services.value[index] = { ...services.value[index], active: previous }
+    }
+    toast.add({
+      title: 'Ошибка',
+      description: error.data?.detail || error.data?.error || error.message || 'Не удалось изменить статус услуги',
+      color: 'error'
+    })
+  } finally {
+    togglingServiceIds.value = new Set([...togglingServiceIds.value].filter(id => id !== service.id))
+  }
+}
+
 function getRowItems(service: Service) {
   return [
     {
@@ -280,7 +249,7 @@ function getRowItems(service: Service) {
   ]
 }
 
-const columns: TableColumn<Service>[] = [
+const columns = computed<TableColumn<Service>[]>(() => [
   {
     accessorKey: 'name',
     header: 'Название',
@@ -292,8 +261,7 @@ const columns: TableColumn<Service>[] = [
     accessorKey: 'duration',
     header: 'Длительность',
     cell: ({ row }) => {
-      const duration = row.original.duration
-      return duration ? `${duration} мин` : '-'
+      return formatDurationMinutes(row.original.duration)
     }
   },
   {
@@ -304,6 +272,25 @@ const columns: TableColumn<Service>[] = [
       return price
         ? h('span', { class: 'font-medium' }, `${Math.round(price).toLocaleString('ru-RU')} ₽`)
         : '-'
+    }
+  },
+  {
+    accessorKey: 'active',
+    header: () => h('span', { class: 'whitespace-nowrap font-medium' }, 'Онлайн-запись'),
+    cell: ({ row }) => {
+      const service = row.original
+      const isActive = service.active !== false
+      const isToggling = togglingServiceIds.value.has(service.id)
+
+      return h('div', { class: 'flex items-center gap-2.5' }, [
+        h(USwitch, {
+          modelValue: isActive,
+          color: 'neutral',
+          disabled: isToggling,
+          'onUpdate:modelValue': (value: boolean) => toggleServiceActive(service, value)
+        }),
+        h('span', { class: 'text-sm text-muted whitespace-nowrap min-w-[2.25rem]' }, isActive ? 'Вкл' : 'Выкл')
+      ])
     }
   },
   {
@@ -331,7 +318,7 @@ const columns: TableColumn<Service>[] = [
       )
     }
   }
-]
+])
 </script>
 
 <template>

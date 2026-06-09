@@ -6,9 +6,16 @@ const model = defineModel<Period>({ required: true })
 
 const props = defineProps<{
   range: Range
+  disabled?: boolean
 }>()
 
 const days = computed(() => eachDayOfInterval(props.range))
+
+const periodLabels: Record<Period, string> = {
+  daily: 'По дням',
+  weekly: 'По неделям',
+  monthly: 'По месяцам'
+}
 
 const periods = computed<Period[]>(() => {
   if (days.value.length <= 8) {
@@ -36,14 +43,22 @@ watch(periods, () => {
     model.value = periods.value[0]!
   }
 })
+
+const periodItems = computed(() =>
+  periods.value.map(value => ({
+    label: periodLabels[value],
+    value
+  }))
+)
 </script>
 
 <template>
   <USelect
     v-model="model"
-    :items="periods"
+    :items="periodItems"
     variant="ghost"
     class="data-[state=open]:bg-elevated"
-    :ui="{ value: 'capitalize', itemLabel: 'capitalize', trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+    :disabled="props.disabled"
+    :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
   />
 </template>

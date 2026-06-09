@@ -11,7 +11,8 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bookly_user}"]
+      # Без -d pg_isready подключается к БД с именем пользователя (bookly_user) — её нет, только bookly_db
+      test: ["CMD-SHELL", "pg_isready -U bookly_user -d bookly_db"]
       interval: 10s
       timeout: 5s
       retries: 5

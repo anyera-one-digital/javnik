@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import LandingHeroBlock from '~/components/LandingPage/LandingHeroBlock.vue'
-import LandingCtaBlock from '~/components/LandingPage/LandingCtaBlock.vue'
-import LandingAbout from '~/components/LandingPage/LandingAbout.vue'
-import LandingAdvantages from '~/components/LandingPage/LandingAdvantages.vue'
-import LandingSuccessStories from '~/components/LandingPage/LandingSuccessStories.vue'
-import LandingPricingPlans from '~/components/LandingPage/LandingPricingPlans.vue'
 import LandingFaqBlock from '~/components/LandingPage/LandingFaqBlock.vue'
+
+definePageMeta({
+  ssr: true
+})
 
 // Сначала пробуем загрузить из админки (Django API), иначе — из Nuxt Content
 const { data: page } = await useAsyncData('index', async () => {
@@ -17,19 +16,17 @@ const { data: page } = await useAsyncData('index', async () => {
 }, {
   default: () => null,
   server: true,
-  lazy: false
+  lazy: false,
+  getCachedData(key, nuxtApp) {
+    if (nuxtApp.isHydrating && nuxtApp.payload.data[key]) {
+      return nuxtApp.payload.data[key]
+    }
+    return undefined
+  }
 })
 
-// Сохраняем данные в ref для стабильности
-const pageData = ref(page.value)
-watch(page, (newVal) => {
-  if (newVal) {
-    pageData.value = newVal
-  }
-}, { immediate: true })
-
-const title = computed(() => pageData.value?.seo?.title || pageData.value?.title || '')
-const description = computed(() => pageData.value?.seo?.description || pageData.value?.description || '')
+const title = computed(() => page.value?.seo?.title || page.value?.title || '')
+const description = computed(() => page.value?.seo?.description || page.value?.description || '')
 
 useSeoMeta({
   titleTemplate: '',
@@ -41,30 +38,15 @@ useSeoMeta({
 </script>
 
 <template>
-  <div v-if="pageData">
+  <div v-if="page">
     <LandingHeroBlock
-      v-if="pageData?.title"
-      :title="pageData.title"
-      :description="pageData.description"
+      v-if="page.title"
+      :title="page.title"
+      :description="page.description"
     />
-
-    <LandingAbout :sections="pageData.sections" />
-
-    <LandingAdvantages :features="pageData.features" />
-
-    <LandingSuccessStories :testimonials="pageData.testimonials" />
 
     <USeparator />
 
-    <LandingPricingPlans :pricing="pageData.pricing" />
-
-    <LandingFaqBlock :faq="pageData.faq" />
-
-    <USeparator />
-
-    <LandingCtaBlock
-      v-if="pageData.cta"
-      :cta="pageData.cta"
-    />
+    <LandingFaqBlock :faq="page.faq" />
   </div>
 </template>

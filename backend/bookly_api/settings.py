@@ -195,3 +195,17 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = config('CORS_ALLOW_CREDENTIALS', default=True, cast=bool)
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Разрешить все origins в режиме разработки
+
+# T‑Bank (Т‑Касса) — интернет‑эквайринг подписки Pro
+# Документация: https://developer.tbank.ru/eacq/api
+TBANK_TERMINAL_KEY = config('TBANK_TERMINAL_KEY', default='')
+TBANK_PASSWORD = config('TBANK_PASSWORD', default='')
+TBANK_API_URL = config(
+    'TBANK_API_URL',
+    default='https://securepay.tinkoff.ru/v2',
+)
+# Публичный URL фронта для SuccessURL / FailURL
+FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:4000')
+# Публичный URL API для webhook (если пусто — TBANK_NOTIFICATION_URL обязателен)
+API_PUBLIC_BASE_URL = config('API_PUBLIC_BASE_URL', default='')
+TBANK_NOTIFICATION_URL = config('TBANK_NOTIFICATION_URL', default='')

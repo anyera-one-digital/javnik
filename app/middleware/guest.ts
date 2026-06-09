@@ -1,3 +1,7 @@
+function isSignupTempUsername(username: string | undefined): boolean {
+  return !!username && /^u_[a-f0-9]{12}$/.test(username)
+}
+
 export default defineNuxtRouteMiddleware((to, from) => {
   // Middleware работает только на клиенте
   if (process.server) {
@@ -12,14 +16,28 @@ export default defineNuxtRouteMiddleware((to, from) => {
     const storedUser = localStorage.getItem('auth.user')
     
     if (storedToken && storedUser) {
-      // Если данные есть в localStorage, но состояние не инициализировано,
-      // значит пользователь авторизован, перенаправляем
-      return navigateTo('/schedule')
+      if (to.path === '/signup') {
+        try {
+          const u = JSON.parse(storedUser) as { username?: string }
+          if (isSignupTempUsername(u.username)) {
+            // Регистрация: после кода пользователь с временным username остаётся на /signup
+          } else {
+            return navigateTo('/schedule')
+          }
+        } catch {
+          return navigateTo('/schedule')
+        }
+      } else {
+        return navigateTo('/schedule')
+      }
     }
   }
 
-  // Если пользователь уже авторизован, перенаправляем на dashboard
+  // Если пользователь уже авторизован, перенаправляем на dashboard (кроме незавершённой регистрации)
   if (isAuthenticated.value) {
+    if (to.path === '/signup' && isSignupTempUsername(user.value?.username)) {
+      return
+    }
     return navigateTo('/schedule')
   }
 })

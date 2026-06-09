@@ -32,8 +32,35 @@ export interface User {
   service_address_lat?: number
   service_address_lon?: number
   is_email_verified?: boolean
+  /** Кнопка «Расписание» на публичной странице записи */
+  show_public_schedule?: boolean
+  show_public_reviews?: boolean
+  show_public_portfolio?: boolean
   created_at?: string
   updated_at?: string
+  /** effective для дней без явной записи WorkSchedule; см. workScheduleTemplate */
+  work_schedule_template?: string
+  shift_cycle?: string
+  shift_anchor_date?: string | null
+  subscription?: UserSubscription
+}
+
+export interface UserSubscription {
+  plan: 'free' | 'pro'
+  effectivePlan: 'free' | 'pro'
+  planLabel: string
+  storedPlanLabel: string
+  expiresAt: string | null
+  startedAt: string | null
+  isActive: boolean
+  isTrial: boolean
+  grantedVia: 'trial' | 'admin' | 'payment' | null
+  daysRemaining: number | null
+  limits: {
+    maxCustomers: number
+    maxBookingsPerMonth: number
+    maxServices: number
+  }
 }
 
 export interface Customer {
@@ -45,6 +72,8 @@ export interface Customer {
   avatar?: string
   status?: 'regular' | 'loyal' | 'vip' | 'first-time'
   notes?: string
+  visits_count?: number
+  last_visit_date?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -59,7 +88,6 @@ export interface Service {
   cover_image?: string
   cover_image_url?: string
   portfolio_images?: ServiceImage[]
-  assignedMembers?: number[]
   active?: boolean
   created_at?: string
   updated_at?: string
@@ -74,26 +102,11 @@ export interface ServiceImage {
   created_at?: string
 }
 
-export interface Member {
-  id: number
-  user?: number
-  name: string
-  email: string
-  phone?: string
-  avatar?: string
-  position?: string
-  active?: boolean
-  created_at?: string
-  updated_at?: string
-}
-
 export interface Event {
   id: number
   user?: number
   service?: number
   serviceId?: number | null
-  member?: number
-  employeeId?: number
   name: string
   description?: string
   date: string
@@ -115,8 +128,6 @@ export interface Booking {
   service?: number
   serviceId?: number
   serviceName?: string
-  member?: number
-  employeeId?: number
   event?: number
   eventId?: number
   date: string
@@ -172,14 +183,58 @@ export interface Review {
   updated_at?: string
 }
 
-export interface Subscription {
-  id?: number
-  user?: number
-  plan: 'free' | '1' | '3' | '6' | '12'
-  planLabel: string
-  startDate?: string
-  endDate?: string | null // null для Free (бесконечный)
-  isActive: boolean
-  pricePerMonth?: number
-  totalPaid?: number
+export type Period = 'daily' | 'weekly' | 'monthly'
+
+export interface Range {
+  start: Date
+  end: Date
+}
+
+export interface Stat {
+  title: string
+  icon: string
+  value: string | number
+  variation: number
+  to?: string
+}
+
+export interface AnalyticsMetric {
+  value: number
+  variation: number
+  previousValue?: number
+}
+
+export interface AnalyticsStatsResponse {
+  newClients: AnalyticsMetric
+  regularClients: AnalyticsMetric
+  bookings: AnalyticsMetric
+  completedBookings: AnalyticsMetric
+}
+
+export interface AnalyticsRevenuePoint {
+  date: string
+  amount: number
+}
+
+export type AnalyticsRevenueMode = 'actual' | 'potential'
+
+export interface AnalyticsRevenueResponse {
+  total: number
+  points: AnalyticsRevenuePoint[]
+  mode?: AnalyticsRevenueMode
+}
+
+export interface AnalyticsBreakdownItem {
+  label: string
+  value: number
+}
+
+export interface AnalyticsServiceBreakdownSection {
+  total: number
+  items: AnalyticsBreakdownItem[]
+}
+
+export interface AnalyticsServicesBreakdownResponse {
+  bookingsByService: AnalyticsServiceBreakdownSection
+  revenueByService: AnalyticsServiceBreakdownSection
 }

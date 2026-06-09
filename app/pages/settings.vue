@@ -7,6 +7,10 @@ definePageMeta({
 })
 
 const links = [[{
+  label: 'Общие',
+  icon: 'i-lucide-sliders-horizontal',
+  to: '/settings/general'
+}, {
   label: 'Уведомления',
   icon: 'i-lucide-bell',
   to: '/settings/notifications'
@@ -28,12 +32,17 @@ const links = [[{
 
       <UDashboardToolbar>
         <!-- NOTE: The `-mx-1` class is used to align with the `DashboardSidebarCollapse` button here. -->
-        <UNavigationMenu :items="links" highlight class="-mx-1 flex-1" />
+        <UNavigationMenu
+          :items="links"
+          highlight
+          color="neutral"
+          class="-mx-1 flex-1"
+        />
       </UDashboardToolbar>
     </template>
 
     <template #body>
-      <div class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full mx-auto" :class="$route.path === '/settings/schedule' ? 'max-w-full' : 'lg:max-w-5xl'">
+      <div class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full mx-auto lg:max-w-5xl">
         <NuxtPage />
       </div>
     </template>

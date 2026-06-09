@@ -14,7 +14,7 @@ const sections = [{
   description: 'Где мы можем уведомлять вас?',
   fields: [{
     name: 'email',
-    label: 'Email',
+    label: 'Электронная почта',
     description: 'Получать ежедневную сводку по email.'
   }, {
     name: 'desktop',
@@ -24,8 +24,7 @@ const sections = [{
 }]
 
 async function onChange() {
-  // Do something with data
-  console.log(state)
+  // TODO: сохранить настройки через API
 }
 </script>
 
@@ -49,6 +48,7 @@ async function onChange() {
       >
         <USwitch
           v-model="state[field.name]"
+          color="neutral"
           @update:model-value="onChange"
         />
       </UFormField>

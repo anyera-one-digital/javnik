@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Customer, Service, ServiceImage, Member, Event, Booking, WorkSchedule, WorkBreak, Review
+from .models import Customer, Service, ServiceImage, Event, Booking, WorkSchedule, WorkBreak, Review
 
 
 @admin.register(Customer)
@@ -34,17 +34,9 @@ class ServiceImageAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
 
 
-@admin.register(Member)
-class MemberAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'phone', 'position', 'active', 'user', 'created_at')
-    list_filter = ('active', 'created_at')
-    search_fields = ('name', 'email', 'phone')
-    readonly_fields = ('created_at', 'updated_at')
-
-
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('name', 'date', 'start_time', 'service', 'member', 'max_participants', 'booked_slots', 'user')
+    list_display = ('name', 'date', 'start_time', 'service', 'max_participants', 'booked_slots', 'user')
     list_filter = ('date', 'service', 'created_at')
     search_fields = ('name', 'description')
     readonly_fields = ('created_at', 'updated_at')
@@ -52,7 +44,7 @@ class EventAdmin(admin.ModelAdmin):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('customer', 'service', 'date', 'start_time', 'status', 'member', 'user', 'created_at')
+    list_display = ('customer', 'service', 'date', 'start_time', 'status', 'user', 'created_at')
     list_filter = ('status', 'date', 'created_at')
     search_fields = ('customer__name', 'service__name', 'notes')
     readonly_fields = ('created_at', 'updated_at')

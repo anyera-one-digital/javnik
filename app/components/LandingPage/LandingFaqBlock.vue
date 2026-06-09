@@ -1,3 +1,21 @@
+<script setup lang="ts">
+const props = defineProps<{
+  faq?: {
+    title?: string
+    description?: string
+    items?: Array<{ label: string, content: string }>
+  }
+}>()
+
+const accordionItems = computed(() =>
+  (props.faq?.items || []).map((item, index) => ({
+    label: item.label,
+    content: item.content,
+    value: String(index)
+  }))
+)
+</script>
+
 <template>
   <UPageSection
     v-if="faq"
@@ -5,26 +23,24 @@
     :title="faq.title"
     :description="faq.description"
   >
-    <UAccordion
-      :items="faq.items || []"
-      :unmount-on-hide="false"
-      :default-value="['0']"
-      type="multiple"
-      class="max-w-3xl mx-auto"
-      :ui="{
-        trigger: 'text-base text-highlighted',
-        body: 'text-base text-muted'
-      }"
-    />
+    <template #body>
+      <UAccordion
+        v-if="accordionItems.length"
+        :items="accordionItems"
+        type="single"
+        collapsible
+        :unmount-on-hide="false"
+        class="w-full max-w-3xl mx-auto"
+        :ui="{
+          root: 'flex flex-col w-full border-t border-default',
+          item: 'flex flex-col w-full border-b border-default bg-transparent shadow-none',
+          header: 'w-full',
+          trigger: 'flex w-full items-center justify-between gap-4 py-4 text-left text-base text-highlighted',
+          trailingIcon: 'shrink-0 size-5 text-muted',
+          content: 'w-full',
+          body: 'pb-4 text-base text-muted'
+        }"
+      />
+    </template>
   </UPageSection>
 </template>
-
-<script setup lang="ts">
-defineProps<{
-  faq?: {
-    title?: string
-    description?: string
-    items?: Array<{ label: string; content: string }>
-  }
-}>()
-</script>

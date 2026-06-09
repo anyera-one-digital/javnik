@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/** Временно: только нижняя полоска (условия, политика, ©) */
+const showFooterTop = false
+
 const columns = [{
   label: 'Ресурсы',
   children: [{
@@ -51,12 +54,12 @@ function onSubmit() {
 
 <template>
   <USeparator
-    label="Я"
+    :label="showFooterTop ? 'Я' : undefined"
     class="h-px"
   />
 
-  <UFooter :ui="{ top: 'border-b border-default' }">
-    <template #top>
+  <UFooter :ui="{ top: showFooterTop ? 'border-b border-default' : '' }">
+    <template v-if="showFooterTop" #top>
       <UContainer>
         <UFooterColumns :columns="columns">
           <template #right>
@@ -70,7 +73,7 @@ function onSubmit() {
                   v-model="email"
                   type="email"
                   class="w-full"
-                  placeholder="Введите ваш email"
+                  placeholder="Введите электронную почту"
                 >
                   <template #trailing>
                     <UButton
@@ -89,32 +92,23 @@ function onSubmit() {
     </template>
 
     <template #left>
-      <p class="text-muted text-sm">
-        <ULink to="/terms" class="text-foreground hover:underline">Условия использования</ULink>
-        <span class="mx-2">•</span>
-        <ULink to="/privacy" class="text-foreground hover:underline">Политика конфиденциальности</ULink>
-        <span class="mx-2">•</span>
-        © {{ new Date().getFullYear() }}
-      </p>
+      <div class="space-y-1">
+        <p class="text-muted text-sm m-0">
+          © {{ new Date().getFullYear() }} ООО «ЭНИЕРА». Все права защищены.
+        </p>
+        <p class="text-muted text-sm m-0 flex flex-wrap gap-x-3 gap-y-0.5">
+          <span>ОГРН 1236300014807</span>
+          <span>ИНН 6319260879</span>
+        </p>
+      </div>
     </template>
 
     <template #right>
-      <UButton
-        to="https://go.nuxt.com/discord"
-        target="_blank"
-        icon="i-simple-icons-discord"
-        aria-label="Nuxt on Discord"
-        color="neutral"
-        variant="ghost"
-      />
-      <UButton
-        to="https://go.nuxt.com/x"
-        target="_blank"
-        icon="i-simple-icons-x"
-        aria-label="Nuxt on X"
-        color="neutral"
-        variant="ghost"
-      />
+      <p class="text-muted text-sm m-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+        <ULink to="/terms" class="text-foreground hover:underline">Условия использования</ULink>
+        <span aria-hidden="true">•</span>
+        <ULink to="/privacy" class="text-foreground hover:underline">Политика конфиденциальности</ULink>
+      </p>
     </template>
   </UFooter>
 </template>

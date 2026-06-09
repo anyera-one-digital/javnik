@@ -24,7 +24,7 @@ const confirmPassword = ref('')
 
 // Схема для шага 1: ввод email
 const emailSchema = z.object({
-  email: z.string().email('Неверный формат email')
+  email: z.string().email('Неверный формат электронной почты')
 })
 
 type EmailSchema = z.output<typeof emailSchema>
@@ -147,15 +147,15 @@ function goBack() {
         </div>
         <h1 class="text-xl font-semibold mb-1.5">Восстановление пароля</h1>
         <p class="text-muted text-sm">
-          Введите ваш email, и мы отправим код подтверждения для восстановления пароля
+          Введите электронную почту — мы отправим код подтверждения для восстановления пароля
         </p>
       </div>
 
-      <UFormField name="email" label="Email" required>
+      <UFormField name="email" label="Электронная почта" required>
         <UInput
           v-model="email"
           type="email"
-          placeholder="Введите ваш email"
+          placeholder="Введите электронную почту"
           icon="i-lucide-mail"
           size="lg"
           :disabled="isLoading"
@@ -226,26 +226,24 @@ function goBack() {
       </UFormField>
 
       <UFormField name="newPassword" label="Новый пароль" required>
-        <UInput
+        <PasswordInput
           v-model="newPassword"
-          type="password"
           placeholder="Введите новый пароль (минимум 8 символов)"
           icon="i-lucide-lock"
           size="lg"
           :disabled="isLoading"
-          class="w-full"
+          autocomplete="new-password"
         />
       </UFormField>
 
       <UFormField name="confirmPassword" label="Подтвердите пароль" required>
-        <UInput
+        <PasswordInput
           v-model="confirmPassword"
-          type="password"
           placeholder="Повторите новый пароль"
           icon="i-lucide-lock"
           size="lg"
           :disabled="isLoading"
-          class="w-full"
+          autocomplete="new-password"
         />
       </UFormField>
 

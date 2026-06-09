@@ -28,23 +28,34 @@ const code = computed(() => digits.value.join(''))
 const fields = [{
   name: 'email',
   type: 'text' as const,
-  label: 'Email',
-  placeholder: 'Введите ваш email',
-  required: true
+  label: 'Электронная почта',
+  placeholder: 'Введите электронную почту',
+  required: true,
+  defaultValue: ''
 }, {
   name: 'password',
   label: 'Пароль',
   type: 'password' as const,
-  placeholder: 'Введите ваш пароль'
-}, {
-  name: 'remember',
-  label: 'Запомнить меня',
-  type: 'checkbox' as const
+  placeholder: 'Введите ваш пароль',
+  required: true,
+  defaultValue: ''
 }]
 
+/** undefined/null из полей формы → строка, иначе Zod даёт «expected string, received undefined» (англ.) */
 const schema = z.object({
-  email: z.string().email('Неверный формат email'),
-  password: z.string().min(1, 'Пароль обязателен для заполнения')
+  email: z
+    .union([z.string(), z.undefined(), z.null()])
+    .transform((v) => (v == null ? '' : String(v)))
+    .pipe(
+      z
+        .string()
+        .min(1, 'Укажите электронную почту')
+        .email('Введите корректный адрес электронной почты')
+    ),
+  password: z
+    .union([z.string(), z.undefined(), z.null()])
+    .transform((v) => (v == null ? '' : String(v)))
+    .pipe(z.string().min(1, 'Введите пароль'))
 })
 
 type Schema = z.output<typeof schema>
@@ -141,7 +152,7 @@ function goBack() {
       :fields="fields"
       :schema="schema"
       :loading="isLoading"
-      title="Добро пожаловать"
+      title="Вход"
       icon="i-lucide-lock"
       :submit="{ label: 'Войти', color: 'neutral', variant: 'solid', class: '!bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100' }"
       @submit="onSubmit"
@@ -149,14 +160,22 @@ function goBack() {
       <template #description>
         Нет аккаунта? <ULink
           to="/signup"
-          class="text-foreground font-medium hover:underline"
+          class="link-inline"
         >Зарегистрируйтесь</ULink>.
+      </template>
+
+      <template #password-field="{ state, field }">
+        <PasswordInput
+          v-model="(state as { email: string; password: string }).password"
+          :placeholder="(field as { placeholder?: string }).placeholder"
+          autocomplete="current-password"
+        />
       </template>
 
       <template #password-hint>
         <ULink
           to="/forgot-password"
-          class="text-foreground font-medium hover:underline"
+          class="link-inline"
           tabindex="-1"
         >Забыли пароль?</ULink>
       </template>
@@ -164,7 +183,7 @@ function goBack() {
       <template #footer>
         Входя в систему, вы соглашаетесь с нашими <ULink
           to="/terms"
-          class="text-foreground font-medium hover:underline"
+          class="link-inline"
         >Условиями использования</ULink>.
       </template>
     </UAuthForm>
@@ -173,7 +192,7 @@ function goBack() {
   <div v-else class="space-y-4">
     <div class="text-center">
       <h1 class="text-xl font-semibold text-highlighted">
-        Подтвердите email
+        Подтвердите электронную почту
       </h1>
       <p class="mt-1.5 text-muted text-sm">
         Мы отправили код на <strong>{{ pendingEmail }}</strong>
@@ -198,7 +217,7 @@ function goBack() {
             inputmode="numeric"
             maxlength="1"
             :autocomplete="i === 0 ? 'one-time-code' : 'off'"
-            class="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-semibold rounded-lg border-2 border-default bg-background text-foreground focus:border-foreground/50 focus:ring-2 focus:ring-default focus:outline-none transition-all"
+            class="size-11 text-center text-lg sm:text-xl font-semibold rounded-lg border-2 border-default bg-background text-foreground focus:border-foreground/50 focus:ring-2 focus:ring-default focus:outline-none transition-all"
             @input="onDigitInput(i, $event)"
             @keydown="onDigitKeydown(i, $event)"
             @paste="onDigitPaste($event)"
@@ -241,7 +260,7 @@ function goBack() {
     <p class="text-center text-muted text-xs">
       Нет аккаунта? <ULink
         to="/signup"
-        class="text-foreground font-medium hover:underline"
+        class="link-inline"
       >Зарегистрируйтесь</ULink>
     </p>
   </div>

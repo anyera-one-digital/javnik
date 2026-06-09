@@ -75,6 +75,12 @@ a[class*="ui-button"] {
   border-radius: 30px !important;
 }
 
+/* Auth: кнопка «назад» — круг (перекрывает глобальный border-radius: 30px для ui-button) */
+.auth-page a.auth-back-button,
+.auth-page button.auth-back-button {
+  border-radius: 9999px !important;
+}
+
 /* Стили для полной заливки звезд (акцент lime-600) */
 [class*="text-primary"] svg,
 [class*="text-primary"] svg path,
@@ -132,8 +138,27 @@ button[class*="primary"],
   color: var(--ui-color-foreground) !important;
 }
 
-/* Стили для навигации в хедере - белые ссылки с подчеркиванием ТОЛЬКО при ховере */
-/* Максимально агрессивные селекторы для переопределения всех стилей Nuxt UI */
+/* Встроенные ссылки рядом с приглушённым текстом: чуть ярче muted, подчёркивание только при наведении */
+.auth-page a.link-inline,
+.auth-forms-neutral a.link-inline {
+  font-weight: 500;
+  text-decoration: none !important;
+  text-underline-offset: 3px;
+  transition: text-decoration 0.15s ease, color 0.15s ease;
+  color: rgb(63 63 70) !important; /* zinc-600 — ярче типичного muted */
+}
+
+.dark .auth-page a.link-inline,
+.dark .auth-forms-neutral a.link-inline {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.auth-page a.link-inline:hover,
+.auth-forms-neutral a.link-inline:hover {
+  text-decoration: underline !important;
+}
+
+/* Навигация в хедере лендинга: тёмный текст в светлой теме, белый в тёмной */
 .header-nav a,
 .header-nav a:visited,
 .header-nav a:link,
@@ -163,14 +188,13 @@ button[class*="primary"],
 .header-nav [class*="text-primary-"],
 .header-nav [class*="text-green-"],
 .header-nav [class*="text-lime-"] {
-  color: white !important;
+  color: #1f2937 !important;
   text-decoration: none !important;
-  text-decoration-color: white !important;
+  text-decoration-color: #1f2937 !important;
   transition: text-decoration 0.2s ease !important;
-  font-size: 0.8125rem !important; /* 13px - еще меньше */
+  font-size: 0.8125rem !important;
 }
 
-/* Убираем подчеркивание для активных ссылок */
 .header-nav a[aria-current="page"],
 .header-nav a.active,
 .header-nav a[class*="active"],
@@ -182,11 +206,11 @@ button[class*="primary"],
 .header-nav [data-headlessui-state="active"],
 .header-nav [class*="active"] a,
 .header-nav [class*="active"] button {
-  color: white !important;
+  color: #1f2937 !important;
   text-decoration: none !important;
+  text-decoration-color: #1f2937 !important;
 }
 
-/* Подчеркивание ТОЛЬКО при ховере */
 .header-nav a:hover,
 .header-nav button:hover,
 .header-nav [role="link"]:hover,
@@ -198,79 +222,82 @@ button[class*="primary"],
 .header-nav li button:hover,
 .header-nav [class*="ui-navigation-menu"] a:hover,
 .header-nav [class*="ui-navigation-menu"] button:hover {
+  color: #1f2937 !important;
+  text-decoration: underline !important;
+  text-decoration-color: #1f2937 !important;
+  text-underline-offset: 4px !important;
+}
+
+.dark .header-nav a,
+.dark .header-nav a:visited,
+.dark .header-nav a:link,
+.dark .header-nav a:active,
+.dark .header-nav a:focus,
+.dark .header-nav button,
+.dark .header-nav button:visited,
+.dark .header-nav button:link,
+.dark .header-nav button:active,
+.dark .header-nav button:focus,
+.dark .header-nav [role="link"],
+.dark .header-nav [role="button"],
+.dark .header-nav nav a,
+.dark .header-nav nav button,
+.dark .header-nav ul a,
+.dark .header-nav ul button,
+.dark .header-nav li a,
+.dark .header-nav li button,
+.dark .header-nav li span,
+.dark .header-nav span,
+.dark .header-nav [class*="ui-navigation-menu"] a,
+.dark .header-nav [class*="ui-navigation-menu"] button,
+.dark .header-nav [class*="ui-navigation-menu"] span,
+.dark .header-nav [class*="text-primary"],
+.dark .header-nav [class*="text-green"],
+.dark .header-nav [class*="text-lime"],
+.dark .header-nav [class*="text-primary-"],
+.dark .header-nav [class*="text-green-"],
+.dark .header-nav [class*="text-lime-"] {
   color: white !important;
-  text-decoration: underline !important;
   text-decoration-color: white !important;
-  text-underline-offset: 4px !important;
 }
 
-/* Переопределение для светлой темы - темный текст на светлом фоне */
-.light .header-nav a,
-.light .header-nav a:visited,
-.light .header-nav a:link,
-.light .header-nav a:active,
-.light .header-nav a:focus,
-.light .header-nav button,
-.light .header-nav button:visited,
-.light .header-nav button:link,
-.light .header-nav button:active,
-.light .header-nav button:focus,
-.light .header-nav [role="link"],
-.light .header-nav [role="button"],
-.light .header-nav nav a,
-.light .header-nav nav button,
-.light .header-nav ul a,
-.light .header-nav ul button,
-.light .header-nav li a,
-.light .header-nav li button,
-.light .header-nav li span,
-.light .header-nav span,
-.light .header-nav [class*="ui-navigation-menu"] a,
-.light .header-nav [class*="ui-navigation-menu"] button,
-.light .header-nav [class*="ui-navigation-menu"] span,
-.light .header-nav [class*="text-primary"],
-.light .header-nav [class*="text-green"],
-.light .header-nav [class*="text-lime"],
-.light .header-nav [class*="text-primary-"],
-.light .header-nav [class*="text-green-"],
-.light .header-nav [class*="text-lime-"] {
-  color: #1f2937 !important; /* dark gray для светлой темы */
-  text-decoration: none !important;
-  text-decoration-color: #1f2937 !important;
-  transition: text-decoration 0.2s ease !important;
-  font-size: 0.8125rem !important;
+.dark .header-nav a[aria-current="page"],
+.dark .header-nav a.active,
+.dark .header-nav a[class*="active"],
+.dark .header-nav button[aria-current="page"],
+.dark .header-nav button.active,
+.dark .header-nav button[class*="active"],
+.dark .header-nav [role="link"][aria-current="page"],
+.dark .header-nav [role="link"].active,
+.dark .header-nav [data-headlessui-state="active"],
+.dark .header-nav [class*="active"] a,
+.dark .header-nav [class*="active"] button {
+  color: white !important;
+  text-decoration-color: white !important;
 }
 
-.light .header-nav a:hover,
-.light .header-nav button:hover,
-.light .header-nav [role="link"]:hover,
-.light .header-nav nav a:hover,
-.light .header-nav nav button:hover,
-.light .header-nav ul a:hover,
-.light .header-nav ul button:hover,
-.light .header-nav li a:hover,
-.light .header-nav li button:hover,
-.light .header-nav [class*="ui-navigation-menu"] a:hover,
-.light .header-nav [class*="ui-navigation-menu"] button:hover {
-  color: #1f2937 !important;
-  text-decoration: underline !important;
-  text-decoration-color: #1f2937 !important;
-  text-underline-offset: 4px !important;
+.dark .header-nav a:hover,
+.dark .header-nav button:hover,
+.dark .header-nav [role="link"]:hover,
+.dark .header-nav nav a:hover,
+.dark .header-nav nav button:hover,
+.dark .header-nav ul a:hover,
+.dark .header-nav ul button:hover,
+.dark .header-nav li a:hover,
+.dark .header-nav li button:hover,
+.dark .header-nav [class*="ui-navigation-menu"] a:hover,
+.dark .header-nav [class*="ui-navigation-menu"] button:hover {
+  color: white !important;
+  text-decoration-color: white !important;
 }
 
-.light .header-nav a[aria-current="page"],
-.light .header-nav a.active,
-.light .header-nav a[class*="active"],
-.light .header-nav button[aria-current="page"],
-.light .header-nav button.active,
-.light .header-nav button[class*="active"],
-.light .header-nav [role="link"][aria-current="page"],
-.light .header-nav [role="link"].active,
-.light .header-nav [data-headlessui-state="active"],
-.light .header-nav [class*="active"] a,
-.light .header-nav [class*="active"] button {
-  color: #1f2937 !important;
-  text-decoration: none !important;
+/* Лендинг: скрыть меню «⋯» у нативного видеоплеера (скачать, скорость, PiP) */
+.landing-hero-video::-webkit-media-controls-overflow-button {
+  display: none;
+}
+
+.landing-hero-video::-webkit-media-controls-enclosure {
+  overflow: hidden;
 }
 
 /* Лендинг: монохромные кнопки — белые/с белой обводкой в тёмной теме, тёмные в светлой */
@@ -333,6 +360,12 @@ button[class*="primary"],
   color: white !important;
 }
 
+/* ЛК: не переопределяем height — у UDashboardGroup уже fixed inset-0; лишний height/svh
+   ломал заполнение вьюпорта и давал полосу фона снизу */
+.dashboard-page {
+  align-items: stretch !important;
+}
+
 /* Dashboard (личный кабинет): монохромный акцент — черный (светлая) / белый (темная) */
 .dashboard-page [class*="ui-button"][class*="neutral"]:not([class*="outline"]):not([class*="ghost"]) {
   background-color: #18181b !important;
@@ -385,36 +418,60 @@ button[class*="primary"],
   color: #18181b !important;
 }
 
-/* Dashboard: тарифы — монохром вместо зелёного (ring, кнопки) */
-.dashboard-page #payment [class*="ring-primary"],
-.dashboard-page #payment [class*="ring-accented"],
-.dashboard-page [class*="ui-pricing-plan"][class*="ring-primary"],
-.dashboard-page [class*="ui-pricing-plan"][class*="ring-accented"] {
-  --tw-ring-color: rgb(63 63 70) !important;
-  border-color: rgb(63 63 70) !important;
+/* Dashboard: переключатели USwitch — монохром вместо зелёного primary */
+.dashboard-page [role="switch"][data-state="checked"],
+.dashboard-page button[role="switch"][data-state="checked"],
+.dashboard-page [class*="ui-switch"][data-state="checked"] {
+  background-color: #18181b !important;
 }
 
-.dark .dashboard-page #payment [class*="ring-primary"],
-.dark .dashboard-page #payment [class*="ring-accented"],
-.dark .dashboard-page [class*="ui-pricing-plan"][class*="ring-primary"],
-.dark .dashboard-page [class*="ui-pricing-plan"][class*="ring-accented"] {
-  --tw-ring-color: rgba(255, 255, 255, 0.5) !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
+.dark .dashboard-page [role="switch"][data-state="checked"],
+.dark .dashboard-page button[role="switch"][data-state="checked"],
+.dark .dashboard-page [class*="ui-switch"][data-state="checked"] {
+  background-color: white !important;
 }
 
-/* Выделенный план в тарифах — монохром вместо зелёного */
-.landing-page #pricing [class*="ring-primary"],
-.landing-page #pricing [class*="ring-accented"] {
-  --tw-ring-color: rgb(63 63 70) !important;
-  border-color: rgb(63 63 70) !important;
+/* Dashboard: подчёркивание highlight в горизонтальном меню (настройки) */
+.dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [data-active],
+.dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] a[aria-current="page"] {
+  color: #18181b !important;
 }
 
-.dark .landing-page #pricing [class*="ring-primary"],
-.dark .landing-page #pricing [class*="ring-accented"] {
-  --tw-ring-color: rgba(255, 255, 255, 0.5) !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
+.dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [data-active] svg,
+.dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] a[aria-current="page"] svg {
+  color: #18181b !important;
 }
 
+.dark .dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [data-active],
+.dark .dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] a[aria-current="page"] {
+  color: white !important;
+}
+
+.dark .dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [data-active] svg,
+.dark .dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] a[aria-current="page"] svg {
+  color: white !important;
+}
+
+.dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [class*="bg-primary"],
+.dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [class*="after:bg-primary"]::after {
+  background-color: #18181b !important;
+}
+
+.dark .dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [class*="bg-primary"],
+.dark .dashboard-page [class*="ui-navigation-menu"][data-orientation="horizontal"] [class*="after:bg-primary"]::after {
+  background-color: white !important;
+}
+
+/* Dashboard: solid-кнопки primary → монохром (если забыли color="neutral") */
+.dashboard-page [class*="ui-button"][class*="primary"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: #18181b !important;
+  color: white !important;
+}
+
+.dark .dashboard-page [class*="ui-button"][class*="primary"]:not([class*="outline"]):not([class*="ghost"]) {
+  background-color: white !important;
+  color: #18181b !important;
+}
 /* Dashboard sidebar: компактные пункты меню — меньший шрифт, отступы, иконки */
 .dashboard-sidebar-content [class*="ui-navigation-menu"] a,
 .dashboard-sidebar-content [class*="ui-navigation-menu"] button,

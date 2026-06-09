@@ -42,8 +42,6 @@ export default defineEventHandler(async (event) => {
       try {
         const rawBody = await readRawBody(event, false)
         
-        console.log('Updating service with multipart FormData, content-type:', contentType)
-        
         // Проксируем multipart запрос напрямую в Django
         const response = await $fetch<Service>(url, {
           method: method,

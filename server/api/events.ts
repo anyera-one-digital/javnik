@@ -40,7 +40,6 @@ export default defineEventHandler(async (event) => {
 
   if (method === 'POST') {
     const body = await readBody(event)
-    console.log('Events API: POST request body:', JSON.stringify(body, null, 2))
     try {
       const response = await $fetch<Event>(url, {
         method: 'POST',

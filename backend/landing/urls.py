@@ -4,4 +4,5 @@ from . import views
 urlpatterns = [
     path('landing/', views.landing_page_detail),
     path('landing/<slug:slug>/', views.landing_page_detail),
+    path('landing/legal/<slug:slug>/', views.legal_page_detail),
 ]

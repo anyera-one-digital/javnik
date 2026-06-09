@@ -1,28 +1,22 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { Booking } from '~/types'
-import { isSameDay, format, startOfDay, parse } from 'date-fns'
+import { startOfDay } from 'date-fns'
 import ScheduleSidebarCalendar from '~/components/UserPersonalAccount/schedule/SidebarCalendar.vue'
 import SidebarProfile from '~/components/UserPersonalAccount/SidebarProfile.vue'
 
-const route = useRoute()
-const router = useRouter()
 const toast = useToast()
 
 const open = ref(false)
 
-// Нормализуем дату из query параметра
-function parseDateFromQuery(dateStr: string | undefined): Date {
-  if (!dateStr) return startOfDay(new Date())
-  // Используем parse для правильной интерпретации даты в формате yyyy-MM-dd
-  try {
-    return startOfDay(parse(dateStr, 'yyyy-MM-dd', new Date()))
-  } catch {
-    return startOfDay(new Date())
-  }
+const isDashboardMobile = useMediaQuery('(max-width: 767px)')
+const colorMode = useColorMode()
+
+function toggleSidebarTheme() {
+  colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
 }
 
-const selectedScheduleDate = ref<Date>(route.path === '/schedule' && route.query.date ? parseDateFromQuery(route.query.date as string) : startOfDay(new Date()))
+const { selectedDate: selectedScheduleDate, pushScheduleDate } = useSchedulePageDate()
 
 const { getAuthHeaders } = useAuth()
 const { data: scheduleBookings } = await useFetch<Booking[]>('/api/bookings', {
@@ -31,68 +25,32 @@ const { data: scheduleBookings } = await useFetch<Booking[]>('/api/bookings', {
 })
 
 function handleDateSelect(date: Date) {
-  // Нормализуем дату перед сохранением
-  const normalizedDate = startOfDay(date)
-  selectedScheduleDate.value = normalizedDate
-  // Используем format вместо toISOString для правильной работы с локальным временем
-  const dateStr = format(normalizedDate, 'yyyy-MM-dd')
-  if (route.path !== '/schedule') {
-    router.push({
-      path: '/schedule',
-      query: {
-        date: dateStr
-      }
-    })
-  } else {
-    router.push({
-      query: {
-        ...route.query,
-        date: dateStr
-      }
-    })
-  }
+  void pushScheduleDate(startOfDay(date)).catch(() => {})
 }
 
-// Синхронизируем selectedScheduleDate с route.query.date
-watch(() => route.query.date, (dateStr) => {
-  if (dateStr && typeof dateStr === 'string' && route.path === '/schedule') {
-    const newDate = parseDateFromQuery(dateStr)
-    if (!isSameDay(newDate, selectedScheduleDate.value)) {
-      selectedScheduleDate.value = newDate
-    }
-  }
-}, { immediate: true })
-
 const links = [[{
-  label: 'Аналитика',
-  icon: 'i-lucide-layout-dashboard',
-  to: '/dashboard',
-  onSelect: () => { open.value = false }
-}, {
   label: 'Расписание',
   icon: 'i-lucide-calendar',
   to: '/schedule',
+  onSelect: () => { open.value = false }
+}, {
+  label: 'Аналитика',
+  icon: 'i-lucide-layout-dashboard',
+  to: '/dashboard',
   onSelect: () => { open.value = false }
 }, {
   label: 'Клиенты',
   icon: 'i-lucide-users',
   to: '/customers',
   onSelect: () => { open.value = false }
-}]] satisfies NavigationMenuItem[][]
-
-const { user, logout } = useAuth()
-
-const middleLinks = computed<NavigationMenuItem[][]>(() => [[{
+}, {
   label: 'Услуги',
   icon: 'i-lucide-scissors',
   to: '/services',
   onSelect: () => { open.value = false }
-}, {
-  label: 'График',
-  icon: 'i-lucide-calendar-clock',
-  to: '/work-schedule',
-  onSelect: () => { open.value = false }
-}]])
+}]] satisfies NavigationMenuItem[][]
+
+const { user, logout } = useAuth()
 
 const accountLinks = computed<NavigationMenuItem[][]>(() => [[{
   label: 'Тарифный план',
@@ -142,7 +100,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <UDashboardGroup unit="rem" storage-key="dashboard-v3" class="dashboard-page">
+  <UDashboardGroup
+    unit="rem"
+    storage-key="dashboard-v3"
+    class="dashboard-page !items-stretch w-full min-h-0"
+  >
     <UDashboardSidebar
       id="default"
       v-model:open="open"
@@ -150,74 +112,84 @@ onMounted(async () => {
       :default-size="23"
       :min-size="22.5"
       :max-size="24.5"
-      class="bg-elevated/25"
+      class="bg-elevated/25 h-full min-h-0 self-stretch"
+      :ui="{ header: 'max-md:flex max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-3 max-md:border-b max-md:border-default' }"
     >
+      <template v-if="isDashboardMobile" #header>
+        <div class="flex flex-1 items-center gap-2 min-w-0">
+          <NuxtLink
+            to="/schedule"
+            class="text-sm font-bold text-highlighted tracking-tight shrink-0"
+            @click="open = false"
+          >
+            Явьник
+          </NuxtLink>
+          <UButton
+            :icon="colorMode.value === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon'"
+            color="neutral"
+            variant="ghost"
+            square
+            size="xs"
+            class="ml-auto shrink-0"
+            aria-label="Переключить тему"
+            @click="toggleSidebarTheme"
+          />
+        </div>
+      </template>
+
       <template #default="{ collapsed }">
-        <div class="dashboard-sidebar-content flex flex-col flex-1 min-h-0 px-[36px]">
+        <div class="dashboard-sidebar-content flex h-full min-h-0 flex-col flex-1 overflow-y-auto px-[36px]">
           <SidebarProfile :collapsed="collapsed" />
 
           <ScheduleSidebarCalendar
-          v-if="!collapsed"
-          :selected-date="selectedScheduleDate"
-          :bookings="scheduleBookings"
-          @update:selected-date="handleDateSelect"
-          class="mb-2"
-        />
+            v-if="!collapsed"
+            :selected-date="selectedScheduleDate"
+            :bookings="scheduleBookings"
+            class="mb-2"
+            @update:selected-date="handleDateSelect"
+          />
 
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="links[0]"
-          orientation="vertical"
-          color="neutral"
-          tooltip
-          popover
-          class="px-4 mb-0"
-          :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
-        />
+          <UNavigationMenu
+            :collapsed="collapsed"
+            :items="links[0]"
+            orientation="vertical"
+            color="neutral"
+            tooltip
+            popover
+            class="px-4 mb-0"
+            :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
+          />
 
-        <div class="border-t border-default my-[8px] mx-4" />
+          <div class="border-t border-default my-[8px] mx-4" />
 
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="middleLinks[0]"
-          orientation="vertical"
-          color="neutral"
-          tooltip
-          popover
-          class="px-4 mb-0"
-          :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
-        />
+          <UNavigationMenu
+            :collapsed="collapsed"
+            :items="accountLinks[0]"
+            orientation="vertical"
+            color="neutral"
+            tooltip
+            popover
+            class="px-4 mb-0"
+            :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
+          />
 
-        <div class="border-t border-default my-[8px] mx-4" />
+          <div class="border-t border-default my-[8px] mx-4" />
 
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="accountLinks[0]"
-          orientation="vertical"
-          color="neutral"
-          tooltip
-          popover
-          class="px-4 mb-0"
-          :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
-        />
-
-        <div class="border-t border-default my-[8px] mx-4" />
-
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="accountBottomLinks[0]"
-          orientation="vertical"
-          color="neutral"
-          tooltip
-          popover
-          class="px-4 mb-0"
-          :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
-        />
+          <UNavigationMenu
+            :collapsed="collapsed"
+            :items="accountBottomLinks[0]"
+            orientation="vertical"
+            color="neutral"
+            tooltip
+            popover
+            class="px-4 mb-0"
+            :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
+          />
         </div>
       </template>
     </UDashboardSidebar>
 
-    <div class="flex-1 min-w-0 overflow-auto md:pr-[36px]">
+    <div class="h-full min-h-0 min-w-0 flex-1 self-stretch overflow-auto md:pr-[36px]">
       <slot />
     </div>
   </UDashboardGroup>

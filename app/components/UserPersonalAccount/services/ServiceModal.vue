@@ -251,8 +251,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       formData.append('removed_portfolio_image_ids', JSON.stringify(removedPortfolioImageIds.value))
     }
     
-    console.log('Sending form data to server')
-
     if (props.service) {
       // Обновление существующей услуги
       await $fetch(`/api/services/${props.service.id}`, {
@@ -270,16 +268,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       })
     } else {
       // Создание новой услуги
-      const createdService = await $fetch<Service>('/api/services', {
+      await $fetch<Service>('/api/services', {
         method: 'POST',
         headers: {
           Authorization: authToken
         },
         body: formData
       })
-      
-      console.log('Service created successfully:', createdService)
-      
+
       toast.add({
         title: 'Успешно',
         description: `Новая услуга "${event.data.name}" создана`,

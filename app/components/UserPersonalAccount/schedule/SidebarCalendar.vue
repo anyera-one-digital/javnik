@@ -19,8 +19,8 @@ const currentMonth = ref(props.selectedDate ? new Date(props.selectedDate.getFul
 
 const monthStart = computed(() => startOfMonth(currentMonth.value))
 const monthEnd = computed(() => endOfMonth(currentMonth.value))
-const calendarStart = computed(() => startOfWeek(monthStart.value, { locale: ru }))
-const calendarEnd = computed(() => endOfWeek(monthEnd.value, { locale: ru }))
+const calendarStart = computed(() => startOfWeek(monthStart.value, { locale: ru, weekStartsOn: 1 }))
+const calendarEnd = computed(() => endOfWeek(monthEnd.value, { locale: ru, weekStartsOn: 1 }))
 
 const calendarDays = computed(() => {
   return eachDayOfInterval({ start: calendarStart.value, end: calendarEnd.value })
@@ -75,11 +75,6 @@ function nextMonth() {
   currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + 1, 1)
 }
 
-function goToToday() {
-  const today = new Date()
-  currentMonth.value = today
-  selectDate(today)
-}
 </script>
 
 <template>
@@ -134,17 +129,6 @@ function goToToday() {
         {{ format(day, 'd') }}
       </button>
     </div>
-
-    <UButton
-      color="neutral"
-      variant="ghost"
-      size="xs"
-      block
-      class="mt-2"
-      @click="goToToday"
-    >
-      Сегодня
-    </UButton>
   </div>
 </template>
 

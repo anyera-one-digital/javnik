@@ -42,32 +42,23 @@ export default defineEventHandler(async (event) => {
       return response
     } else if (method === 'POST') {
       const body = await readBody(event)
-      
-      console.log('Schedule API received POST request')
-      console.log('Body:', JSON.stringify(body, null, 2))
-      
-      // Поддерживаем как одиночный объект, так и массив
       const schedules = Array.isArray(body) ? body : [body]
-      
+
       const results = []
       for (const schedule of schedules) {
         try {
-          console.log('Sending to Django:', JSON.stringify(schedule, null, 2))
           const response = await $fetch(url, {
             method: 'POST',
             headers: {
               Authorization: normalizedAuth,
               'Content-Type': 'application/json',
-              'Accept': 'application/json'
+              Accept: 'application/json'
             },
             body: schedule
           })
-          console.log('Django response:', response)
           results.push(response)
         } catch (djangoError: any) {
-          console.error('Django error:', djangoError)
-          console.error('Django error data:', djangoError.data)
-          console.error('Django error response:', djangoError.response)
+          console.error('Schedule POST error:', djangoError.statusCode || djangoError.status, djangoError.data)
           throw djangoError
         }
       }

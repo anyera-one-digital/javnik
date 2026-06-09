@@ -2,6 +2,8 @@
 import type { TableColumn } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
+import { format, parseISO } from 'date-fns'
+import { ru } from 'date-fns/locale'
 import type { Customer } from '~/types'
 import { h, resolveComponent } from 'vue'
 import CustomersAddModal from '~/components/UserPersonalAccount/customers/AddModal.vue'
@@ -36,7 +38,6 @@ async function loadCustomers() {
     let headers = getAuthHeaders()
     
     if (!headers.Authorization) {
-      console.warn('No auth token available for loading customers')
       customers.value = []
       return
     }
@@ -58,11 +59,9 @@ async function loadCustomers() {
     } catch (error: any) {
       // Если получили 401, пытаемся обновить токен
       if (error.statusCode === 401 || error.status === 401) {
-        console.log('Got 401 for customers, attempting to refresh token...')
         const refreshed = await refreshAccessToken()
-        
+
         if (refreshed) {
-          console.log('Token refreshed, retrying customers request...')
           headers = getAuthHeaders()
           
           try {
@@ -143,6 +142,15 @@ function deleteCustomer(customer: Customer) {
   deletingCustomer.value = customer
 }
 
+function formatLastVisit(dateStr: string | null | undefined) {
+  if (!dateStr) return '—'
+  try {
+    return format(parseISO(dateStr), 'd MMMM yyyy', { locale: ru })
+  } catch {
+    return '—'
+  }
+}
+
 function getRowItems(row: Row<Customer>) {
   return [
     {
@@ -179,13 +187,33 @@ const columns: TableColumn<Customer>[] = [
   },
   {
     accessorKey: 'email',
-    header: 'Email',
+    header: 'Электронная почта',
     cell: ({ row }) => row.original.email || '-'
   },
   {
     accessorKey: 'phone',
     header: 'Телефон',
     cell: ({ row }) => row.original.phone || '-'
+  },
+  {
+    accessorKey: 'visits_count',
+    header: () => h('span', { class: 'whitespace-nowrap' }, 'Визиты'),
+    cell: ({ row }) => h('span', { class: 'whitespace-nowrap tabular-nums' }, String(row.original.visits_count ?? 0))
+  },
+  {
+    accessorKey: 'last_visit_date',
+    header: () => h('span', { class: 'whitespace-nowrap' }, 'Последний визит'),
+    cell: ({ row }) => h(
+      'span',
+      { class: 'whitespace-nowrap' },
+      formatLastVisit(row.original.last_visit_date)
+    ),
+    meta: {
+      class: {
+        th: 'min-w-[10.5rem]',
+        td: 'min-w-[10.5rem]'
+      }
+    }
   },
   {
     id: 'actions',
@@ -242,26 +270,28 @@ const pagination = ref({
     </template>
 
     <template #body>
-      <UTable
-        ref="table"
-        v-model:column-visibility="columnVisibility"
-        v-model:pagination="pagination"
-        :pagination-options="{
-          getPaginationRowModel: getPaginationRowModel()
-        }"
-        class="shrink-0"
-        :data="customers"
-        :columns="columns"
-        :loading="isLoading"
-        :ui="{
-          base: 'table-fixed border-separate border-spacing-0',
-          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-          tbody: '[&>tr]:last:[&>td]:border-b-0',
-          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-          td: 'border-b border-default',
-          separator: 'h-0'
-        }"
-      />
+      <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <UTable
+          ref="table"
+          v-model:column-visibility="columnVisibility"
+          v-model:pagination="pagination"
+          :pagination-options="{
+            getPaginationRowModel: getPaginationRowModel()
+          }"
+          class="customers-table shrink-0 min-w-[44rem]"
+          :data="customers"
+          :columns="columns"
+          :loading="isLoading"
+          :ui="{
+            base: 'border-separate border-spacing-0',
+            thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+            tbody: '[&>tr]:last:[&>td]:border-b-0',
+            th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r whitespace-nowrap',
+            td: 'border-b border-default',
+            separator: 'h-0'
+          }"
+        />
+      </div>
 
       <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
         <div class="text-sm text-muted">
@@ -301,3 +331,10 @@ const pagination = ref({
     @cancelled="deletingCustomer = null"
   />
 </template>
+
+<style scoped>
+.customers-table :deep(thead th:nth-child(5)),
+.customers-table :deep(tbody td:nth-child(5)) {
+  min-width: 10.5rem;
+}
+</style>

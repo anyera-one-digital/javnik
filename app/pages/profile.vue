@@ -50,7 +50,7 @@ const profileSchema = z.object({
   first_name: z.string().min(1, 'Имя обязательно').optional().or(z.literal('')),
   last_name: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email('Неверный email').optional(),
+  email: z.string().email('Неверный формат электронной почты').optional(),
   specialty_id: z.number().nullable().optional(),
   bio: z.string().optional(),
   city: z.string().optional(),
@@ -201,6 +201,19 @@ async function onFileChange(e: Event) {
 function onFileClick() {
   fileRef.value?.click()
 }
+
+function openPublicProfilePreview() {
+  if (!user.value?.username) {
+    toast.add({
+      title: 'Ошибка',
+      description: 'Не удалось получить имя пользователя',
+      color: 'red'
+    })
+    return
+  }
+  const publicProfileUrl = `/booking/${user.value.username}`
+  window.open(publicProfileUrl, '_blank')
+}
 </script>
 
 <template>
@@ -211,13 +224,24 @@ function onFileClick() {
           <div class="hidden"><UDashboardSidebarCollapse /></div>
         </template>
         <template #right>
-          <UButton
-            form="profile-form"
-            label="Сохранить изменения"
-            color="neutral"
-            type="submit"
-            :loading="isLoading"
-          />
+          <div class="flex items-center gap-2">
+            <UButton
+              icon="i-lucide-external-link"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              label="Как это выглядит"
+              :disabled="!user?.username"
+              @click="openPublicProfilePreview"
+            />
+            <UButton
+              form="profile-form"
+              label="Сохранить изменения"
+              color="neutral"
+              type="submit"
+              :loading="isLoading"
+            />
+          </div>
         </template>
       </UDashboardNavbar>
     </template>
@@ -292,7 +316,7 @@ function onFileClick() {
             <USeparator />
             <UFormField
               name="email"
-              label="Email"
+              label="Электронная почта"
               description="Используется для входа. Нельзя изменить."
               required
               class="grid grid-cols-[1fr_1fr] max-sm:grid-cols-1 gap-4 items-start"

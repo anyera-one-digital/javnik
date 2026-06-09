@@ -2,8 +2,11 @@
 import { format, addDays, startOfDay, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { formatWeekdayShort } from '~/utils'
+import { formatDurationMinutes } from '~/utils/formatDuration'
+import { isValidPhoneNumber, PHONE_ERROR_MESSAGE } from '~/utils/phone'
 import type { User, Service, Booking, WorkSchedule, Review } from '~/types'
 import StarIcon from '~/components/UserPublicPage/StarIcon.vue'
+import PublicPageFooter from '~/components/UserPublicPage/PublicPageFooter.vue'
 
 definePageMeta({
   layout: false,
@@ -19,11 +22,7 @@ const toast = useToast()
 const username = computed(() => route.params.username as string)
 
 // Проверяем, находимся ли мы на странице календаря
-const isCalendarPage = computed(() => {
-  const isCalendar = route.path.endsWith('/calendar')
-  console.log('[username].vue - Route path:', route.path, 'isCalendar:', isCalendar)
-  return isCalendar
-})
+const isCalendarPage = computed(() => route.path.endsWith('/calendar'))
 
 // Состояния для загрузки данных
 const publicUser = ref<User | null>(null)
@@ -110,27 +109,7 @@ const loadServices = async () => {
   
   servicesPending.value = true
   try {
-    const servicesUrl = `/api/public/services/${username.value}`
-    console.log('Loading services from:', servicesUrl)
-    const response = await $fetch<Service[]>(servicesUrl)
-    console.log('Services loaded:', response)
-    console.log('Services count:', response?.length || 0)
-    console.log('Services with images:', response?.filter(s => s.cover_image_url).length || 0)
-    console.log('Services without images:', response?.filter(s => !s.cover_image_url).length || 0)
-    
-    // Логируем каждую услугу
-    if (response && Array.isArray(response)) {
-      response.forEach((service, index) => {
-        console.log(`Service [${index}]:`, {
-          id: service.id,
-          name: service.name,
-          has_cover_image: !!service.cover_image_url,
-          cover_image_url: service.cover_image_url,
-          portfolio_count: service.portfolio_images?.length || 0
-        })
-      })
-    }
-    
+    const response = await $fetch<Service[]>(`/api/public/services/${username.value}`)
     services.value = response || []
   } catch (error: any) {
     console.error('Error loading services:', error)
@@ -259,21 +238,32 @@ const loadReviews = async () => {
   }
 }
 
+const showPublicReviews = computed(() => publicUser.value?.show_public_reviews !== false)
+const showPublicPortfolio = computed(() => publicUser.value?.show_public_portfolio !== false)
+const showPublicTabsMenu = computed(() => showPublicPortfolio.value || showPublicReviews.value)
+
+async function loadPublicPageData() {
+  if (!publicUser.value || userError.value) return
+  const tasks: Promise<void>[] = [loadServices()]
+  if (showPublicReviews.value) {
+    tasks.push(loadReviews())
+  } else {
+    reviews.value = []
+  }
+  await Promise.all(tasks)
+}
+
 // Загружаем данные при монтировании
 onMounted(async () => {
   await loadUserProfile()
-  if (publicUser.value && !userError.value) {
-    await Promise.all([loadServices(), loadReviews()])
-  }
+  await loadPublicPageData()
 })
 
 // Перезагружаем при изменении username
 watch(() => username.value, async (newUsername) => {
   if (newUsername) {
     await loadUserProfile()
-    if (publicUser.value && !userError.value) {
-      await Promise.all([loadServices(), loadReviews()])
-    }
+    await loadPublicPageData()
   }
 })
 
@@ -490,6 +480,10 @@ async function submitBooking() {
     toast.add({ title: 'Заполните все обязательные поля', color: 'error' })
     return
   }
+  if (!isValidPhoneNumber(bookingClientForm.phone)) {
+    toast.add({ title: PHONE_ERROR_MESSAGE, color: 'error' })
+    return
+  }
   if (!bookingClientForm.privacyAccepted) {
     toast.add({ title: 'Необходимо согласие с политикой конфиденциальности', color: 'error' })
     return
@@ -543,6 +537,30 @@ const specialty = computed(() => {
   return publicUser.value?.specialty || ''
 })
 
+const fullPublicAddress = computed(() => {
+  const city = publicUser.value?.city?.trim()
+  const street = publicUser.value?.service_address?.trim()
+  if (!city && !street) return ''
+
+  const formatCity = (value: string) => {
+    const normalized = value.trim()
+    if (/^(г\.|г\s|с\.|с\s|п\.|п\s|пгт\.|пгт\s)/i.test(normalized)) {
+      return normalized
+    }
+    return `г. ${normalized}`
+  }
+
+  if (!city) return street!
+  if (!street) return formatCity(city)
+
+  const cityCore = city.replace(/^(г\.|г\s|с\.|с\s|п\.|п\s|пгт\.|пгт\s)\s*/i, '').trim().toLowerCase()
+  if (street.toLowerCase().includes(cityCore)) {
+    return street
+  }
+
+  return `${formatCity(city)}, ${street}`
+})
+
 // URL публичного календаря
 const calendarUrl = computed(() => `/booking/${username.value}/calendar`)
 
@@ -551,6 +569,15 @@ const isServicesExpanded = ref(false)
 
 // Активная вкладка: Услуги | Портфолио | Отзывы
 const activeTab = ref<'services' | 'portfolio' | 'reviews'>('services')
+
+watch([showPublicReviews, showPublicPortfolio], () => {
+  if (activeTab.value === 'reviews' && !showPublicReviews.value) {
+    activeTab.value = 'services'
+  }
+  if (activeTab.value === 'portfolio' && !showPublicPortfolio.value) {
+    activeTab.value = 'services'
+  }
+})
 
 // Фильтр по услугам для портфолио (отдельный от отзывов)
 const selectedPortfolioServiceFilter = ref<number | null>(null)
@@ -614,7 +641,7 @@ watch([publicUser, userError], ([user, error]) => {
 
 <template>
   <!-- Не рендерим профиль на странице календаря, календарь рендерится отдельно -->
-  <div v-if="!isCalendarPage" class="min-h-screen bg-background relative">
+  <div v-if="!isCalendarPage" class="min-h-screen bg-background relative flex flex-col">
     <!-- Кнопка переключения темы -->
     <div class="fixed top-4 right-4 z-50">
       <UButton
@@ -627,13 +654,13 @@ watch([publicUser, userError], ([user, error]) => {
         @click="toggle"
       />
     </div>
-    <div v-if="userPending || (!publicUser && !userError)" class="flex items-center justify-center min-h-screen">
+    <div v-if="userPending || (!publicUser && !userError)" class="flex flex-1 items-center justify-center">
       <div class="text-center space-y-4">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-muted mx-auto"></div>
         <p class="text-muted">Загрузка профиля...</p>
       </div>
     </div>
-    <div v-else-if="userError && !publicUser" class="flex items-center justify-center min-h-screen p-4">
+    <div v-else-if="userError && !publicUser" class="flex flex-1 items-center justify-center p-4">
       <UPageCard variant="subtle" class="max-w-md w-full">
         <div class="text-center space-y-4">
           <div class="text-6xl">😕</div>
@@ -649,9 +676,9 @@ watch([publicUser, userError], ([user, error]) => {
         </div>
       </UPageCard>
     </div>
-    <div v-else-if="publicUser" class="max-w-[1024px] mx-auto px-4 py-8">
+    <div v-else-if="publicUser" class="flex-1 max-w-[1024px] w-full mx-auto px-4 pt-10 pb-8 md:pt-12">
       <div class="mb-4">
-        <div class="flex flex-col md:flex-row items-start gap-8">
+        <div class="flex flex-col items-start gap-8 md:flex-row md:items-center">
           <!-- Аватар (большой круглый) -->
           <UAvatar
             :src="publicUser.avatar_url || null"
@@ -668,17 +695,14 @@ watch([publicUser, userError], ([user, error]) => {
 
           <!-- Информация -->
           <div class="flex-1 flex flex-col">
-            <!-- Имя и город -->
-            <div class="flex items-baseline gap-3 mb-2">
-              <h1 class="text-xl font-bold md:text-3xl">{{ displayName }}</h1>
-              <span v-if="publicUser.city" class="text-base text-muted">г.{{ publicUser.city }}</span>
+            <!-- Имя и специальность -->
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
+              <h1 class="text-2xl font-bold">{{ displayName }}</h1>
+              <span v-if="specialty" class="text-base text-muted md:text-lg">{{ specialty }}</span>
             </div>
-            
-            <!-- Специальность -->
-            <p v-if="specialty" class="text-base text-muted mb-4 md:text-lg">{{ specialty }}</p>
-            
+
             <!-- Рейтинг и отзывы -->
-            <div v-if="reviewsStats.total > 0" class="flex items-center gap-2 mb-4">
+            <div v-if="showPublicReviews && reviewsStats.total > 0" class="flex items-center gap-2 mb-4">
               <div class="flex items-center gap-0.5">
                 <StarIcon
                   v-for="i in 5"
@@ -706,16 +730,18 @@ watch([publicUser, userError], ([user, error]) => {
               <UButton
                 color="neutral"
                 size="lg"
-                class="!bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
+                class="min-w-[9.5rem] justify-center !px-6 !bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
                 @click="openBookingModalForServiceSelection"
               >
                 <Icon name="i-lucide-calendar-plus" class="w-5 h-5 mr-2" />
                 Записаться
               </UButton>
               <UButton
+                v-if="publicUser.show_public_schedule !== false"
                 color="neutral"
                 size="lg"
                 variant="outline"
+                class="min-w-[9.5rem] justify-center !px-6"
                 :to="calendarUrl"
               >
                 <Icon name="i-lucide-calendar" class="w-5 h-5 mr-2" />
@@ -731,10 +757,10 @@ watch([publicUser, userError], ([user, error]) => {
               Профессиональный специалист с опытом работы. Помогу создать идеальный результат для любого случая!
             </p>
             
-            <!-- Адрес оказания услуг -->
-            <div v-if="publicUser.service_address" class="text-base text-foreground max-w-2xl flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span class="font-semibold">Адрес оказания услуг:</span>
-              <span class="font-normal">{{ publicUser.service_address }}</span>
+            <!-- Адрес -->
+            <div v-if="fullPublicAddress" class="text-base text-foreground max-w-2xl flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="font-semibold">Адрес:</span>
+              <span class="font-normal">{{ fullPublicAddress }}</span>
               <a
                 v-if="publicUser.service_address_lat != null && publicUser.service_address_lon != null"
                 :href="`https://yandex.ru/maps/?pt=${publicUser.service_address_lon},${publicUser.service_address_lat}&z=16&l=map`"
@@ -750,9 +776,12 @@ watch([publicUser, userError], ([user, error]) => {
         </div>
       </div>
 
-      <!-- Вкладки (в стиле Threads) -->
+      <!-- Вкладки (в стиле Threads) — скрываем, если остались только услуги -->
       <div class="pt-1.5">
-        <nav class="flex items-center gap-1 mb-6 border-b border-default">
+        <nav
+          v-if="showPublicTabsMenu"
+          class="flex items-center gap-1 mb-6 border-b border-default"
+        >
           <button
             type="button"
             class="relative py-3 px-4 text-sm font-medium transition-colors -mb-px"
@@ -766,6 +795,7 @@ watch([publicUser, userError], ([user, error]) => {
             />
           </button>
           <button
+            v-if="showPublicPortfolio"
             type="button"
             class="relative py-3 px-4 text-sm font-medium transition-colors -mb-px"
             :class="activeTab === 'portfolio' ? 'text-foreground' : 'text-muted hover:text-foreground'"
@@ -778,6 +808,7 @@ watch([publicUser, userError], ([user, error]) => {
             />
           </button>
           <button
+            v-if="showPublicReviews"
             type="button"
             class="relative py-3 px-4 text-sm font-medium transition-colors -mb-px"
             :class="activeTab === 'reviews' ? 'text-foreground' : 'text-muted hover:text-foreground'"
@@ -812,23 +843,21 @@ watch([publicUser, userError], ([user, error]) => {
                 class="cursor-pointer hover:bg-elevated/50 transition-colors border-b border-default last:border-b-0"
                 @click="openServiceModal(service)"
               >
-                <div class="grid grid-cols-1 gap-2 p-4 md:grid-cols-[1fr_auto_auto_auto] md:items-center md:gap-6">
-                  <h3 class="text-base font-semibold text-highlighted">{{ service.name }}</h3>
-                  <div class="flex items-center justify-between gap-x-4 w-full md:contents">
-                    <div class="flex items-center gap-x-4 gap-y-1 md:contents">
-                      <div class="flex items-center gap-1 text-muted md:justify-self-end">
-                        <Icon name="i-lucide-clock" class="w-4 h-4 shrink-0" />
-                        <span class="text-sm">{{ service.duration }} мин</span>
-                      </div>
-                      <div class="text-base font-semibold text-foreground md:text-left">
-                        {{ Math.round(service.price).toLocaleString('ru-RU') }} ₽
-                      </div>
+                <div class="grid grid-cols-1 gap-2 p-4 md:grid-cols-[minmax(0,1fr)_6.5rem_7rem_auto] md:items-center md:gap-x-6">
+                  <h3 class="text-base font-semibold text-highlighted min-w-0">{{ service.name }}</h3>
+                  <div class="grid w-full grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-3 md:contents">
+                    <div class="flex min-w-0 items-center gap-1 text-muted whitespace-nowrap">
+                      <Icon name="i-lucide-clock" class="w-4 h-4 shrink-0" />
+                      <span class="text-sm">{{ formatDurationMinutes(service.duration) }}</span>
+                    </div>
+                    <div class="text-base font-semibold text-foreground whitespace-nowrap">
+                      {{ Math.round(service.price).toLocaleString('ru-RU') }} ₽
                     </div>
                     <UButton
                       label="Записаться"
                       size="sm"
                       color="neutral"
-                      class="shrink-0 md:ml-auto"
+                      class="shrink-0 min-w-[6.75rem] justify-center !px-4 justify-self-end md:justify-self-end"
                     />
                   </div>
                 </div>
@@ -848,7 +877,7 @@ watch([publicUser, userError], ([user, error]) => {
         </div>
 
         <!-- Портфолио -->
-        <div v-show="activeTab === 'portfolio'" class="mb-12">
+        <div v-if="showPublicPortfolio" v-show="activeTab === 'portfolio'" class="mb-12">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold">
               Портфолио <span class="font-normal text-muted">{{ filteredPortfolioImages.length }}</span>
@@ -903,7 +932,7 @@ watch([publicUser, userError], ([user, error]) => {
         </div>
 
         <!-- Отзывы -->
-        <div v-show="activeTab === 'reviews'" class="mb-8">
+        <div v-if="showPublicReviews" v-show="activeTab === 'reviews'" class="mb-8">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold">
               Отзывы <span class="font-normal text-muted">{{ reviewsStats.total }}</span>
@@ -1019,6 +1048,8 @@ watch([publicUser, userError], ([user, error]) => {
         </div>
       </div>
     </div>
+
+    <PublicPageFooter />
   </div>
 
   <!-- Модальное окно услуги (вне основного контейнера) -->
@@ -1065,30 +1096,29 @@ watch([publicUser, userError], ([user, error]) => {
         
         <!-- Body -->
         <div class="p-6 overflow-y-auto flex-1">
-          <!-- Шаг 0: Список услуг -->
-          <div v-if="serviceModalStep === 0" class="space-y-0">
+          <!-- Шаг 0: Список услуг (та же вёрстка, что в блоке «Услуги» на странице) -->
+          <div v-if="serviceModalStep === 0" class="space-y-0 -mx-6">
             <div
               v-for="service in services"
               :key="service.id"
               class="cursor-pointer hover:bg-elevated/50 transition-colors border-b border-default last:border-b-0"
               @click="selectServiceAndGoToDateStep(service)"
             >
-              <div class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-6 p-4">
-                <div class="min-w-0">
-                  <h3 class="text-base font-semibold text-highlighted">{{ service.name }}</h3>
-                </div>
-                <div class="flex items-center gap-1 text-muted justify-start" style="width: 100px;">
-                  <Icon name="i-lucide-clock" class="w-4 h-4 shrink-0" />
-                  <span class="text-sm">{{ service.duration }} мин</span>
-                </div>
-                <div class="text-base font-semibold text-foreground text-left" style="width: 120px;">
-                  {{ Math.round(service.price).toLocaleString('ru-RU') }} ₽
-                </div>
-                <div class="flex items-center justify-start">
+              <div class="grid grid-cols-1 gap-2 p-4 md:grid-cols-[minmax(0,1fr)_6.5rem_7rem_auto] md:items-center md:gap-x-6">
+                <h3 class="text-base font-semibold text-highlighted min-w-0">{{ service.name }}</h3>
+                <div class="grid w-full grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-3 md:contents">
+                  <div class="flex min-w-0 items-center gap-1 text-muted whitespace-nowrap">
+                    <Icon name="i-lucide-clock" class="w-4 h-4 shrink-0" />
+                    <span class="text-sm">{{ formatDurationMinutes(service.duration) }}</span>
+                  </div>
+                  <div class="text-base font-semibold text-foreground whitespace-nowrap">
+                    {{ Math.round(service.price).toLocaleString('ru-RU') }} ₽
+                  </div>
                   <UButton
                     label="Записаться"
                     size="sm"
                     color="neutral"
+                    class="shrink-0 min-w-[6.75rem] justify-center !px-4 justify-self-end md:justify-self-end"
                   />
                 </div>
               </div>
@@ -1108,7 +1138,7 @@ watch([publicUser, userError], ([user, error]) => {
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <p class="text-sm text-muted mb-1">Длительность</p>
-                <p class="font-semibold">{{ selectedService.duration }} минут</p>
+                <p class="font-semibold">{{ formatDurationMinutes(selectedService.duration) }}</p>
               </div>
               <div>
                 <p class="text-sm text-muted mb-1">Цена</p>
@@ -1224,7 +1254,7 @@ watch([publicUser, userError], ([user, error]) => {
                 />
               </UFormField>
 
-              <UFormField label="Email" required>
+              <UFormField label="Электронная почта" required>
                 <UInput
                   v-model="bookingClientForm.email"
                   type="email"
@@ -1235,12 +1265,11 @@ watch([publicUser, userError], ([user, error]) => {
               </UFormField>
 
               <UFormField label="Телефон" required>
-                <UInput
+                <PhoneInputRu
                   v-model="bookingClientForm.phone"
-                  type="tel"
                   placeholder="+7 (999) 999-99-99"
-                  required
                   class="!w-full"
+                  required
                 />
               </UFormField>
 

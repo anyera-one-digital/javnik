@@ -1,14 +1,33 @@
 from rest_framework import serializers
 import os
 from django.conf import settings
-from .models import Customer, Service, ServiceImage, Member, Event, Booking, WorkSchedule, WorkBreak, Review
+from .models import Customer, Service, ServiceImage, Event, Booking, WorkSchedule, WorkBreak, Review
 
 
 class CustomerSerializer(serializers.ModelSerializer):
+    visits_count = serializers.SerializerMethodField()
+    last_visit_date = serializers.SerializerMethodField()
+
     class Meta:
         model = Customer
         fields = '__all__'
         read_only_fields = ('user', 'created_at', 'updated_at')
+
+    def get_visits_count(self, obj):
+        if hasattr(obj, 'visits_count'):
+            return obj.visits_count
+        return obj.bookings.filter(status='completed').count()
+
+    def get_last_visit_date(self, obj):
+        if hasattr(obj, 'last_visit_date') and obj.last_visit_date:
+            return obj.last_visit_date.isoformat()
+        last = (
+            obj.bookings.filter(status='completed')
+            .order_by('-date')
+            .values_list('date', flat=True)
+            .first()
+        )
+        return last.isoformat() if last else None
 
 
 class ServiceImageSerializer(serializers.ModelSerializer):
@@ -237,13 +256,6 @@ class ServiceSerializer(serializers.ModelSerializer):
             return None
 
 
-class MemberSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Member
-        fields = '__all__'
-        read_only_fields = ('user', 'created_at', 'updated_at')
-
-
 class EventSerializer(serializers.ModelSerializer):
     service_name = serializers.CharField(source='service.name', read_only=True, allow_null=True)
     
@@ -313,8 +325,7 @@ class EventSerializer(serializers.ModelSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.name', read_only=True)
     service_name = serializers.CharField(source='service.name', read_only=True)
-    member_name = serializers.CharField(source='member.name', read_only=True, allow_null=True)
-    
+
     class Meta:
         model = Booking
         fields = '__all__'
@@ -327,8 +338,6 @@ class BookingSerializer(serializers.ModelSerializer):
             data_copy['customer'] = data_copy.pop('customerId')
         if 'serviceId' in data_copy:
             data_copy['service'] = data_copy.pop('serviceId')
-        if 'memberId' in data_copy:
-            data_copy['member'] = data_copy.pop('memberId')
         if 'eventId' in data_copy:
             data_copy['event'] = data_copy.pop('eventId')
         if 'startTime' in data_copy:
@@ -361,21 +370,61 @@ class BookingSerializer(serializers.ModelSerializer):
         if 'service_name' in representation:
             representation['serviceName'] = representation.pop('service_name')
         
-        # Преобразуем member_name в memberName (если есть)
-        if 'member_name' in representation:
-            representation['memberName'] = representation.pop('member_name')
-        
-        # Преобразуем customer, service, member в customerId, serviceId, memberId
+        # Преобразуем customer, service, event в customerId, serviceId, eventId
         if 'customer' in representation:
             representation['customerId'] = representation.pop('customer')
         if 'service' in representation:
             representation['serviceId'] = representation.pop('service')
-        if 'member' in representation:
-            representation['memberId'] = representation.pop('member')
         if 'event' in representation:
             representation['eventId'] = representation.pop('event')
         
         return representation
+
+
+def _work_break_time_ranges_overlap(s1, e1, s2, e2) -> bool:
+    """Полуинтервалы [s1, e1) и [s2, e2) пересекаются (время как в сравнении)."""
+    return s1 < e2 and s2 < e1
+
+
+def _validate_work_schedules_breaks_no_overlap(breaks_data):
+    """
+    breaks_data: список словарей с ключами start_time, end_time (datetime.time).
+    """
+    if not breaks_data:
+        return
+    if len(breaks_data) < 2:
+        for b in breaks_data:
+            if not isinstance(b, dict):
+                continue
+            st = b.get('start_time')
+            et = b.get('end_time')
+            if st is not None and et is not None and st >= et:
+                raise serializers.ValidationError({
+                    'breaks': 'В каждом перерыве время начала должно быть раньше окончания.'
+                })
+        return
+    times = []
+    for b in breaks_data:
+        if not isinstance(b, dict):
+            continue
+        st = b.get('start_time')
+        et = b.get('end_time')
+        if st is None or et is None:
+            continue
+        if st >= et:
+            raise serializers.ValidationError({
+                'breaks': 'В каждом перерыве время начала должно быть раньше окончания.'
+            })
+        times.append((st, et))
+    n = len(times)
+    for i in range(n):
+        for j in range(i + 1, n):
+            a, c = times[i]
+            b, d = times[j]
+            if _work_break_time_ranges_overlap(a, c, b, d):
+                raise serializers.ValidationError({
+                    'breaks': 'Перерывы не могут пересекаться. Скорректируйте интервалы.'
+                })
 
 
 class WorkBreakSerializer(serializers.ModelSerializer):
@@ -383,7 +432,16 @@ class WorkBreakSerializer(serializers.ModelSerializer):
         model = WorkBreak
         fields = ['id', 'start_time', 'end_time']
         read_only_fields = ('id',)
-    
+
+    def validate(self, attrs):
+        st = attrs.get('start_time')
+        et = attrs.get('end_time')
+        if st is not None and et is not None and st >= et:
+            raise serializers.ValidationError(
+                'Время начала перерыва должно быть раньше окончания.'
+            )
+        return attrs
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['startTime'] = representation.pop('start_time')
@@ -408,7 +466,19 @@ class WorkScheduleSerializer(serializers.ModelSerializer):
         model = WorkSchedule
         fields = ['id', 'date', 'type', 'start_time', 'end_time', 'breaks', 'created_at', 'updated_at']
         read_only_fields = ('id', 'user', 'created_at', 'updated_at')
-    
+
+    def validate(self, attrs):
+        schedule_type = attrs.get('type')
+        if schedule_type is None and self.instance is not None:
+            schedule_type = self.instance.type
+        if schedule_type and schedule_type != 'workday':
+            return attrs
+        breaks = attrs.get('breaks')
+        if breaks is None:
+            return attrs
+        _validate_work_schedules_breaks_no_overlap(breaks)
+        return attrs
+
     def to_representation(self, instance):
         # Преобразуем snake_case в camelCase для фронтенда
         representation = super().to_representation(instance)

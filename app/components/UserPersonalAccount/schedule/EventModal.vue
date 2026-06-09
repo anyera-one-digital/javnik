@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Event, Service } from '~/types'
 import { format } from 'date-fns'
+import { formatDurationMinutes } from '~/utils/formatDuration'
+import { onlyActiveServices } from '~/utils/activeServices'
 
 const props = defineProps<{
   event?: Event
@@ -35,45 +37,28 @@ async function loadServices() {
     await new Promise(resolve => setTimeout(resolve, 100))
     
     let headers = getAuthHeaders()
-    
-    console.log('EventModal: Loading services...')
-    console.log('EventModal: Headers:', headers.Authorization ? 'Present' : 'Missing')
-    
+
     if (!headers.Authorization) {
-      console.warn('EventModal: No auth token available for loading services')
       return
     }
-    
+
     try {
       const data = await $fetch<Service[]>('/api/services', {
         headers
       })
-      
-      console.log('EventModal: Services loaded:', data)
-      console.log('EventModal: Services count:', data?.length || 0)
-      console.log('EventModal: Services type:', Array.isArray(data) ? 'array' : typeof data)
-      
+
       if (Array.isArray(data)) {
-        services.value = data
+        services.value = onlyActiveServices(data)
       } else if (data && typeof data === 'object' && 'results' in data) {
-        // Обработка пагинированного ответа
-        services.value = (data as any).results || []
-        console.log('EventModal: Extracted from paginated response:', services.value.length)
+        services.value = onlyActiveServices((data as any).results || [])
       } else {
         services.value = []
-        console.warn('EventModal: Unexpected data format:', data)
       }
-      
-      console.log('EventModal: Final services.value:', services.value)
-      console.log('EventModal: Final services.value.length:', services.value.length)
     } catch (error: any) {
-      // Если получили 401, пытаемся обновить токен
       if (error.statusCode === 401 || error.status === 401) {
-        console.log('EventModal: Got 401, attempting to refresh token...')
         const refreshed = await refreshAccessToken()
-        
+
         if (refreshed) {
-          console.log('EventModal: Token refreshed, retrying request...')
           headers = getAuthHeaders()
           
           try {
@@ -82,9 +67,9 @@ async function loadServices() {
             })
             
             if (Array.isArray(retryData)) {
-              services.value = retryData
+              services.value = onlyActiveServices(retryData)
             } else if (retryData && typeof retryData === 'object' && 'results' in retryData) {
-              services.value = (retryData as any).results || []
+              services.value = onlyActiveServices((retryData as any).results || [])
             } else {
               services.value = []
             }
@@ -111,27 +96,17 @@ async function loadServices() {
   }
 }
 
-// Загружаем услуги при открытии модала
 watch(isOpen, async (open) => {
-  console.log('EventModal: isOpen changed to:', open)
   if (open && process.client) {
-    console.log('EventModal: Modal opened, loading services...')
-    // Небольшая задержка для гарантии, что токен загружен
     await nextTick()
-    // Дополнительная задержка для загрузки токена из localStorage
     setTimeout(() => {
       loadServices()
     }, 200)
-  } else {
-    console.log('EventModal: Modal closed or not on client')
   }
 })
 
-// Загружаем услуги при монтировании компонента (только если модал открыт)
 onMounted(async () => {
-  console.log('EventModal: Component mounted, isOpen:', isOpen.value)
   if (process.client && isOpen.value) {
-    console.log('EventModal: Modal is open on mount, loading services...')
     await nextTick()
     setTimeout(() => {
       loadServices()
@@ -171,13 +146,10 @@ watch(() => form.serviceId, (serviceId) => {
   }
 })
 
-const durationOptions = [
-  { label: '30 минут', value: 30 },
-  { label: '45 минут', value: 45 },
-  { label: '1 час', value: 60 },
-  { label: '1.5 часа', value: 90 },
-  { label: '2 часа', value: 120 }
-]
+const durationOptions = [30, 45, 60, 90, 120].map(value => ({
+  label: formatDurationMinutes(value),
+  value
+}))
 
 watch(() => props.event, (event) => {
   if (event) {
@@ -199,20 +171,7 @@ watch(() => props.defaultDate, (date) => {
 })
 
 async function onSubmit() {
-  console.log('EventModal: onSubmit called')
-  console.log('EventModal: Form values:', {
-    name: form.name,
-    date: form.date,
-    startTime: form.startTime,
-    duration: form.duration,
-    maxParticipants: form.maxParticipants,
-    serviceId: form.serviceId,
-    price: form.price
-  })
-  
-  // Валидация формы
   if (!form.name || !form.date || !form.startTime || !form.maxParticipants) {
-    console.log('EventModal: Validation failed - missing required fields')
     toast.add({
       title: 'Ошибка',
       description: 'Заполните все обязательные поля',
@@ -223,10 +182,7 @@ async function onSubmit() {
 
   // Если услуга не выбрана, требуем стоимость и продолжительность
   if (!form.serviceId) {
-    console.log('EventModal: No service selected, checking price and duration')
-    console.log('EventModal: duration:', form.duration, 'price:', form.price)
     if (!form.duration || !form.price || form.price <= 0) {
-      console.log('EventModal: Validation failed - missing price or duration')
       toast.add({
         title: 'Ошибка',
         description: 'Укажите продолжительность и стоимость события',
@@ -235,8 +191,6 @@ async function onSubmit() {
       return
     }
   }
-  
-  console.log('EventModal: Validation passed, proceeding with request')
 
   try {
     const headers = getAuthHeaders()
@@ -277,18 +231,8 @@ async function onSubmit() {
       body.price = Number(form.price)
     }
 
-    console.log('EventModal: Sending event data:', JSON.stringify(body, null, 2))
-    console.log('EventModal: Form state:', {
-      serviceId: form.serviceId,
-      price: form.price,
-      duration: form.duration
-    })
-
-    console.log('EventModal: Headers:', headers.Authorization ? 'Present' : 'Missing')
-    
     if (props.event) {
-      console.log('EventModal: Updating event:', props.event.id)
-      const response = await $fetch('/api/events', {
+      await $fetch('/api/events', {
         method: 'PATCH',
         headers,
         body: {
@@ -296,20 +240,12 @@ async function onSubmit() {
           ...body
         }
       })
-      console.log('EventModal: Update response:', response)
     } else {
-      console.log('EventModal: Creating new event')
-      console.log('EventModal: Request URL: /api/events')
-      console.log('EventModal: Request method: POST')
-      console.log('EventModal: Request headers:', headers)
-      console.log('EventModal: Request body:', body)
-      
-      const response = await $fetch('/api/events', {
+      await $fetch('/api/events', {
         method: 'POST',
         headers,
         body
       })
-      console.log('EventModal: Create response:', response)
     }
 
     toast.add({
@@ -435,7 +371,7 @@ async function onSubmit() {
             :items="services.value && services.value.length > 0 ? [
               { label: 'Без услуги', value: undefined },
               ...services.value.map(s => ({ 
-                label: `${s.name}${s.duration ? ` (${s.duration} мин)` : ''}${s.price ? `, ${Math.round(s.price).toLocaleString('ru-RU')} ₽` : ''}`, 
+                label: `${s.name}${s.duration ? ` (${formatDurationMinutes(s.duration)})` : ''}${s.price ? `, ${Math.round(s.price).toLocaleString('ru-RU')} ₽` : ''}`, 
                 value: s.id 
               }))
             ] : [

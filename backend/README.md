@@ -259,6 +259,23 @@ curl -X GET http://localhost:8000/api/auth/profile/ \
 docker-compose exec backend python manage.py load_landing_content --force
 ```
 
+## Юридические страницы
+
+В админке раздел **«Лендинг» → «Юридические страницы»** — редактирование текста политики конфиденциальности (`/privacy`) и пользовательского соглашения (`/terms`). Содержимое задаётся в формате HTML (теги `section`, `h2`, `p`, `ul`, `table` и т.д.).
+
+После первой настройки загрузите начальный контент:
+
+```bash
+docker-compose exec backend python manage.py migrate
+docker-compose exec backend python manage.py load_legal_content
+```
+
+Перезапись существующих данных:
+
+```bash
+docker-compose exec backend python manage.py load_legal_content --force
+```
+
 ## Полезные команды
 
 ```bash
@@ -273,6 +290,9 @@ docker-compose exec backend python manage.py createsuperuser
 
 # Загрузка контента лендинга
 docker-compose exec backend python manage.py load_landing_content
+
+# Загрузка юридических страниц (privacy, terms)
+docker-compose exec backend python manage.py load_legal_content
 
 # Сбор статических файлов
 docker-compose exec backend python manage.py collectstatic --noinput

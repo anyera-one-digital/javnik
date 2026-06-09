@@ -1,18 +1,34 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
-from django.db.models import Q, Max
+from accounts.subscription import (
+    check_booking_limit,
+    check_customer_limit,
+    check_service_limit,
+    require_pro_subscription,
+)
+from django.db.models import Count, Q, Max
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from datetime import datetime, timedelta
-from .models import Customer, Service, ServiceImage, Member, Event, Booking, WorkSchedule, Review
+from datetime import datetime, timedelta, date as dt_date
+import logging
+
+from .models import Customer, Service, ServiceImage, Event, Booking, WorkSchedule, Review
+from .effective_schedule import get_effective_schedule_for_validation, merge_schedule_range_for_public_api
+from .analytics import (
+    new_clients_metric,
+    regular_clients_metric,
+    bookings_metric,
+    completed_bookings_metric,
+    revenue_chart,
+    services_breakdown,
+)
 from .serializers import (
     CustomerSerializer,
     ServiceSerializer,
-    MemberSerializer,
     EventSerializer,
     BookingSerializer,
     WorkScheduleSerializer,
@@ -20,6 +36,7 @@ from .serializers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -30,11 +47,14 @@ class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Фильтруем только клиентов текущего пользователя
-        return Customer.objects.filter(user=self.request.user)
+        completed_bookings = Q(bookings__status='completed')
+        return Customer.objects.filter(user=self.request.user).annotate(
+            visits_count=Count('bookings', filter=completed_bookings),
+            last_visit_date=Max('bookings__date', filter=completed_bookings),
+        )
 
     def perform_create(self, serializer):
-        # Автоматически устанавливаем владельца при создании
+        check_customer_limit(self.request.user)
         serializer.save(user=self.request.user)
 
 
@@ -59,8 +79,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         return context
 
     def perform_create(self, serializer):
-        # Автоматически устанавливаем владельца и активность при создании
-        # Убеждаемся, что active=True для новых услуг
+        check_service_limit(self.request.user)
         service = serializer.save(user=self.request.user, active=True)
         
         # Обрабатываем изображения портфолио
@@ -110,28 +129,13 @@ class ServiceViewSet(viewsets.ModelViewSet):
                 )
 
 
-class MemberViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet для управления сотрудниками
-    """
-    serializer_class = MemberSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Фильтруем только сотрудников текущего пользователя
-        return Member.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        # Автоматически устанавливаем владельца при создании
-        serializer.save(user=self.request.user)
-
-
 class EventViewSet(viewsets.ModelViewSet):
     """
     ViewSet для управления событиями
     """
     serializer_class = EventSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # календарь ЛК загружает все события разом
 
     def get_queryset(self):
         # Фильтруем только события текущего пользователя
@@ -194,44 +198,30 @@ class EventViewSet(viewsets.ModelViewSet):
         end_datetime = start_datetime + timedelta(minutes=duration)
         end_time = end_datetime.time()
         
-        # Проверяем график работы на эту дату
-        try:
-            work_schedule = WorkSchedule.objects.get(user=self.request.user, date=date)
-            
-            # Если это выходной день
-            if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
-                type_names = {
-                    'nonworkday': 'выходной день',
-                    'sickleave': 'больничный',
-                    'vacation': 'отпуск'
-                }
-                raise ValidationError({'non_field_errors': [f'Нельзя создать событие в {type_names.get(work_schedule.type, "нерабочий день")}.']})
-            
-            # Если это рабочий день, проверяем рабочее время
-            if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
-                # Проверяем, что время начала и окончания попадают в рабочие часы
-                if start_time < work_schedule.start_time or end_time > work_schedule.end_time:
+        work_schedule = get_effective_schedule_for_validation(self.request.user, date)
+        if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
+            type_names = {
+                'nonworkday': 'выходной день',
+                'sickleave': 'больничный',
+                'vacation': 'отпуск'
+            }
+            raise ValidationError({'non_field_errors': [f'Нельзя создать событие в {type_names.get(work_schedule.type, "нерабочий день")}.']})
+        if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
+            if start_time < work_schedule.start_time or end_time > work_schedule.end_time:
+                raise ValidationError({
+                    'non_field_errors': [
+                        f'Время события выходит за пределы рабочего времени '
+                        f'({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
+                    ]
+                })
+            for break_item in work_schedule.breaks:
+                if (start_time < break_item.end_time and end_time > break_item.start_time):
                     raise ValidationError({
                         'non_field_errors': [
-                            f'Время события выходит за пределы рабочего времени '
-                            f'({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
+                            f'Время события пересекается с перерывом '
+                            f'({break_item.start_time.strftime("%H:%M")} - {break_item.end_time.strftime("%H:%M")}).'
                         ]
                     })
-                
-                # Проверяем перерывы
-                breaks = work_schedule.breaks.all()
-                for break_item in breaks:
-                    # Проверяем пересечение времени события с перерывом
-                    if (start_time < break_item.end_time and end_time > break_item.start_time):
-                        raise ValidationError({
-                            'non_field_errors': [
-                                f'Время события пересекается с перерывом '
-                                f'({break_item.start_time.strftime("%H:%M")} - {break_item.end_time.strftime("%H:%M")}).'
-                            ]
-                        })
-        except WorkSchedule.DoesNotExist:
-            # Если графика нет, разрешаем создание
-            pass
         
         # Проверяем конфликты с существующими бронированиями
         existing_bookings = Booking.objects.filter(
@@ -311,44 +301,30 @@ class EventViewSet(viewsets.ModelViewSet):
         end_datetime = start_datetime + timedelta(minutes=duration)
         end_time = end_datetime.time()
         
-        # Проверяем график работы на эту дату
-        try:
-            work_schedule = WorkSchedule.objects.get(user=self.request.user, date=date)
-            
-            # Если это выходной день
-            if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
-                type_names = {
-                    'nonworkday': 'выходной день',
-                    'sickleave': 'больничный',
-                    'vacation': 'отпуск'
-                }
-                raise ValidationError({'non_field_errors': [f'Нельзя создать событие в {type_names.get(work_schedule.type, "нерабочий день")}.']})
-            
-            # Если это рабочий день, проверяем рабочее время
-            if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
-                # Проверяем, что время начала и окончания попадают в рабочие часы
-                if start_time < work_schedule.start_time or end_time > work_schedule.end_time:
+        work_schedule = get_effective_schedule_for_validation(self.request.user, date)
+        if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
+            type_names = {
+                'nonworkday': 'выходной день',
+                'sickleave': 'больничный',
+                'vacation': 'отпуск'
+            }
+            raise ValidationError({'non_field_errors': [f'Нельзя создать событие в {type_names.get(work_schedule.type, "нерабочий день")}.']})
+        if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
+            if start_time < work_schedule.start_time or end_time > work_schedule.end_time:
+                raise ValidationError({
+                    'non_field_errors': [
+                        f'Время события выходит за пределы рабочего времени '
+                        f'({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
+                    ]
+                })
+            for break_item in work_schedule.breaks:
+                if (start_time < break_item.end_time and end_time > break_item.start_time):
                     raise ValidationError({
                         'non_field_errors': [
-                            f'Время события выходит за пределы рабочего времени '
-                            f'({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
+                            f'Время события пересекается с перерывом '
+                            f'({break_item.start_time.strftime("%H:%M")} - {break_item.end_time.strftime("%H:%M")}).'
                         ]
                     })
-                
-                # Проверяем перерывы
-                breaks = work_schedule.breaks.all()
-                for break_item in breaks:
-                    # Проверяем пересечение времени события с перерывом
-                    if (start_time < break_item.end_time and end_time > break_item.start_time):
-                        raise ValidationError({
-                            'non_field_errors': [
-                                f'Время события пересекается с перерывом '
-                                f'({break_item.start_time.strftime("%H:%M")} - {break_item.end_time.strftime("%H:%M")}).'
-                            ]
-                        })
-        except WorkSchedule.DoesNotExist:
-            # Если графика нет, разрешаем создание
-            pass
         
         # Проверяем конфликты с существующими бронированиями
         existing_bookings = Booking.objects.filter(
@@ -389,18 +365,6 @@ class EventViewSet(viewsets.ModelViewSet):
         # Сохраняем обновление
         serializer.save()
 
-    @action(detail=True, methods=['patch'])
-    def update_booked_slots(self, request, pk=None):
-        """
-        Обновление количества забронированных мест
-        """
-        event = self.get_object()
-        booked_slots = request.data.get('booked_slots', event.booked_slots)
-        event.booked_slots = booked_slots
-        event.save()
-        serializer = self.get_serializer(event)
-        return Response(serializer.data)
-
 
 class BookingViewSet(viewsets.ModelViewSet):
     """
@@ -408,21 +372,24 @@ class BookingViewSet(viewsets.ModelViewSet):
     """
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # календарь ЛК загружает все брони недели/дня
 
     def get_queryset(self):
-        # Фильтруем только бронирования текущего пользователя
-        queryset = Booking.objects.filter(user=self.request.user)
-        
-        # Фильтрация по дате, если указана
+        # Только актуальные брони: отменённые не показываем в ЛК/календаре
+        # (согласовано с public_bookings_view и освобождением слота после отмены)
+        queryset = Booking.objects.filter(user=self.request.user).exclude(status='cancelled')
+
         date = self.request.query_params.get('date', None)
         if date:
             queryset = queryset.filter(date=date)
-        
-        # Фильтрация по сотруднику, если указан
-        employee_id = self.request.query_params.get('employeeId', None)
-        if employee_id:
-            queryset = queryset.filter(member_id=employee_id)
-        
+
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
         return queryset.order_by('date', 'start_time')
 
     def create(self, request, *args, **kwargs):
@@ -442,6 +409,8 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def _create_booking(self, request):
         """Внутренняя логика создания бронирования"""
+        check_booking_limit(request.user)
+
         # Получаем данные из запроса
         customer_id = request.data.get('customerId')
         service_id = request.data.get('serviceId')
@@ -462,10 +431,14 @@ class BookingViewSet(viewsets.ModelViewSet):
                 'error': 'Клиент не найден.'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Получаем услугу для определения длительности
+        # Получаем услугу для определения длительности (только активные)
         try:
-            service = Service.objects.get(id=service_id, user=request.user)
+            service = Service.objects.get(id=service_id, user=request.user, active=True)
         except Service.DoesNotExist:
+            if Service.objects.filter(id=service_id, user=request.user, active=False).exists():
+                return Response({
+                    'error': 'Услуга отключена для записи. Включите её на странице «Услуги».'
+                }, status=status.HTTP_400_BAD_REQUEST)
             return Response({
                 'error': 'Услуга не найдена.'
             }, status=status.HTTP_404_NOT_FOUND)
@@ -475,42 +448,30 @@ class BookingViewSet(viewsets.ModelViewSet):
         end_datetime = start_datetime + timedelta(minutes=int(duration))
         end_time = end_datetime.strftime('%H:%M')
         
-        # Проверяем график работы на эту дату
-        try:
-            work_schedule = WorkSchedule.objects.get(user=request.user, date=date)
-            
-            # Если это выходной день
-            if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
-                type_names = {
-                    'nonworkday': 'выходной день',
-                    'sickleave': 'больничный',
-                    'vacation': 'отпуск'
-                }
+        booking_date = datetime.strptime(date, '%Y-%m-%d').date()
+        work_schedule = get_effective_schedule_for_validation(request.user, booking_date)
+        if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
+            type_names = {
+                'nonworkday': 'выходной день',
+                'sickleave': 'больничный',
+                'vacation': 'отпуск'
+            }
+            return Response({
+                'error': f'Нельзя создать запись в {type_names.get(work_schedule.type, "нерабочий день")}.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
+            st = start_time[:5] if len(start_time) > 5 else start_time
+            if st < work_schedule.start_time.strftime('%H:%M') or end_time > work_schedule.end_time.strftime('%H:%M'):
                 return Response({
-                    'error': f'Нельзя создать запись в {type_names.get(work_schedule.type, "нерабочий день")}.'
+                    'error': f'Время записи выходит за пределы рабочего времени ({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Если это рабочий день, проверяем рабочее время
-            if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
-                # Проверяем, что время начала и окончания попадают в рабочие часы
-                if start_time < work_schedule.start_time.strftime('%H:%M') or end_time > work_schedule.end_time.strftime('%H:%M'):
+            for break_item in work_schedule.breaks:
+                break_start = break_item.start_time.strftime('%H:%M')
+                break_end = break_item.end_time.strftime('%H:%M')
+                if (st < break_end and end_time > break_start):
                     return Response({
-                        'error': f'Время записи выходит за пределы рабочего времени ({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
+                        'error': f'Время записи пересекается с перерывом ({break_start} - {break_end}).'
                     }, status=status.HTTP_400_BAD_REQUEST)
-                
-                # Проверяем перерывы
-                breaks = work_schedule.breaks.all()
-                for break_item in breaks:
-                    break_start = break_item.start_time.strftime('%H:%M')
-                    break_end = break_item.end_time.strftime('%H:%M')
-                    # Проверяем пересечение времени записи с перерывом
-                    if (start_time < break_end and end_time > break_start):
-                        return Response({
-                            'error': f'Время записи пересекается с перерывом ({break_start} - {break_end}).'
-                        }, status=status.HTTP_400_BAD_REQUEST)
-        except WorkSchedule.DoesNotExist:
-            # Если графика нет, разрешаем создание (можно добавить проверку по умолчанию)
-            pass
         
         # Проверяем конфликты с существующими бронированиями
         # Проверяем только активные бронирования (не отмененные и не завершенные)
@@ -697,6 +658,8 @@ def public_services_view(request, username):
             
             serializer = ServiceSerializer(service, context={'request': request})
             service_data = serializer.data
+            if user.show_public_portfolio is False:
+                service_data['portfolio_images'] = []
             services_data.append(service_data)
             
             if settings.DEBUG:
@@ -775,6 +738,8 @@ def public_schedule_view(request, username):
     """
     Получение публичного графика работы пользователя по username
     GET /api/public/schedule/<username>/
+    При start_date + end_date: для каждого дня диапазона — явная запись WorkSchedule
+    либо расчёт по шаблону профиля (work_schedule_template).
     """
     try:
         user = User.objects.get(username=username, is_active=True)
@@ -783,21 +748,39 @@ def public_schedule_view(request, username):
             'error': 'Пользователь не найден.'
         }, status=status.HTTP_404_NOT_FOUND)
     
-    queryset = WorkSchedule.objects.filter(user=user).prefetch_related('breaks')
-    
-    # Фильтрация по дате, если указана
-    date = request.query_params.get('date', None)
-    if date:
-        queryset = queryset.filter(date=date)
-    
-    # Фильтрация по диапазону дат
     start_date = request.query_params.get('start_date', None)
     end_date = request.query_params.get('end_date', None)
+    one_date = request.query_params.get('date', None)
+
+    if one_date and not (start_date and end_date):
+        try:
+            d0 = dt_date.fromisoformat(str(one_date)[:10])
+        except ValueError:
+            d0 = None
+        if d0:
+            return Response(merge_schedule_range_for_public_api(user, d0, d0), status=status.HTTP_200_OK)
+
+    if start_date and end_date:
+        try:
+            s = dt_date.fromisoformat(str(start_date)[:10])
+            e = dt_date.fromisoformat(str(end_date)[:10])
+        except ValueError:
+            return Response(
+                {'error': 'Неверный формат start_date / end_date (ожидается YYYY-MM-DD).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if e < s:
+            s, e = e, s
+        return Response(merge_schedule_range_for_public_api(user, s, e), status=status.HTTP_200_OK)
+
+    queryset = WorkSchedule.objects.filter(user=user).prefetch_related('breaks')
+    if one_date:
+        queryset = queryset.filter(date=one_date)
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
     if end_date:
         queryset = queryset.filter(date__lte=end_date)
-    
+
     serializer = WorkScheduleSerializer(queryset.order_by('date'), many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -833,18 +816,22 @@ def public_booking_create_view(request, username):
             'error': 'Необходимо указать имя, email и телефон клиента.'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Получаем или создаем клиента
-    customer, created = Customer.objects.get_or_create(
-        user=user,
-        email=customer_email,
-        defaults={
-            'name': customer_name,
-            'phone': customer_phone,
-            'status': 'first-time'
-        }
-    )
-    
-    # Обновляем данные клиента, если он уже существует
+    check_booking_limit(user)
+
+    customer = Customer.objects.filter(user=user, email=customer_email).first()
+    created = False
+    if customer is None:
+        check_customer_limit(user)
+        customer, created = Customer.objects.get_or_create(
+            user=user,
+            email=customer_email,
+            defaults={
+                'name': customer_name,
+                'phone': customer_phone,
+                'status': 'first-time'
+            }
+        )
+
     if not created:
         customer.name = customer_name
         customer.phone = customer_phone
@@ -853,13 +840,11 @@ def public_booking_create_view(request, username):
     # Получаем услугу или событие
     service = None
     event = None
-    member = None
-    
+
     if event_id:
         try:
             event = Event.objects.get(id=event_id, user=user)
             service = event.service
-            member = event.member
             # Используем данные из события
             date = event.date
             start_time = event.start_time
@@ -902,13 +887,39 @@ def public_booking_create_view(request, username):
     booking_start_time = start_datetime.time()
     booking_end_time = end_datetime.time()
     
+    work_schedule = get_effective_schedule_for_validation(user, booking_date)
+    if work_schedule.type in ['nonworkday', 'sickleave', 'vacation']:
+        type_names = {
+            'nonworkday': 'выходной день',
+            'sickleave': 'больничный',
+            'vacation': 'отпуск'
+        }
+        return Response({
+            'error': f'Нельзя создать запись в {type_names.get(work_schedule.type, "нерабочий день")}.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    if work_schedule.type == 'workday' and work_schedule.start_time and work_schedule.end_time:
+        if booking_start_time < work_schedule.start_time or booking_end_time > work_schedule.end_time:
+            return Response({
+                'error': (
+                    f'Время записи выходит за пределы рабочего времени '
+                    f'({work_schedule.start_time.strftime("%H:%M")} - {work_schedule.end_time.strftime("%H:%M")}).'
+                )
+            }, status=status.HTTP_400_BAD_REQUEST)
+        for break_item in work_schedule.breaks:
+            if booking_start_time < break_item.end_time and booking_end_time > break_item.start_time:
+                return Response({
+                    'error': (
+                        f'Время записи пересекается с перерывом '
+                        f'({break_item.start_time.strftime("%H:%M")} - {break_item.end_time.strftime("%H:%M")}).'
+                    )
+                }, status=status.HTTP_400_BAD_REQUEST)
+    
     # Создаем бронирование
     try:
         booking = Booking.objects.create(
             user=user,
             customer=customer,
             service=service,
-            member=member,
             event=event,
             date=booking_date,
             start_time=booking_start_time,
@@ -917,11 +928,10 @@ def public_booking_create_view(request, username):
             notes=notes or ''
         )
     except Exception as e:
-        import traceback
+        logger.exception('public_booking_create failed for user %s', user.pk)
         return Response({
             'error': 'Не удалось создать бронирование.',
             'detail': str(e),
-            'traceback': traceback.format_exc()
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     # Если это бронирование на событие, увеличиваем счетчик забронированных мест
@@ -943,6 +953,36 @@ class WorkScheduleViewSet(viewsets.ModelViewSet):
     serializer_class = WorkScheduleSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None  # Отключаем пагинацию
+
+    def list(self, request, *args, **kwargs):
+        """
+        При start_date + end_date — эффективный график (явные записи + шаблон профиля),
+        как в публичном API, чтобы сетка в ЛК совпадала с публичной страницей.
+        """
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date and end_date:
+            try:
+                s = dt_date.fromisoformat(str(start_date)[:10])
+                e = dt_date.fromisoformat(str(end_date)[:10])
+            except ValueError:
+                return Response(
+                    {'error': 'Неверный формат start_date / end_date (ожидается YYYY-MM-DD).'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if e < s:
+                s, e = e, s
+            # Редактор графика: только явные записи в БД (без подмешивания шаблона)
+            explicit_only = request.query_params.get('explicit_only', '').lower() in (
+                '1', 'true', 'yes',
+            )
+            if explicit_only:
+                return super().list(request, *args, **kwargs)
+            return Response(
+                merge_schedule_range_for_public_api(request.user, s, e),
+                status=status.HTTP_200_OK,
+            )
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         # Фильтруем только графики текущего пользователя
@@ -996,6 +1036,132 @@ class WorkScheduleViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def analytics_stats_view(request):
+    """
+    Метрики аналитики за выбранный период.
+    GET /api/analytics/stats/?start=YYYY-MM-DD&end=YYYY-MM-DD
+    """
+    require_pro_subscription(request.user)
+
+    start_str = request.query_params.get('start')
+    end_str = request.query_params.get('end')
+    if not start_str or not end_str:
+        return Response(
+            {'error': 'Укажите параметры start и end (YYYY-MM-DD).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        start = datetime.strptime(start_str, '%Y-%m-%d').date()
+        end = datetime.strptime(end_str, '%Y-%m-%d').date()
+    except ValueError:
+        return Response(
+            {'error': 'Некорректный формат даты. Используйте YYYY-MM-DD.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if start > end:
+        return Response(
+            {'error': 'Дата начала не может быть позже даты окончания.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response({
+        'newClients': new_clients_metric(request.user, start, end),
+        'regularClients': regular_clients_metric(request.user, start, end),
+        'bookings': bookings_metric(request.user, start, end),
+        'completedBookings': completed_bookings_metric(request.user, start, end),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def analytics_revenue_view(request):
+    """
+    Доход для графика аналитики.
+    GET /api/analytics/revenue/?start=&end=&period=daily|weekly|monthly&mode=actual|potential
+    """
+    require_pro_subscription(request.user)
+
+    start_str = request.query_params.get('start')
+    end_str = request.query_params.get('end')
+    period = request.query_params.get('period', 'daily')
+    mode = request.query_params.get('mode', 'actual')
+
+    if not start_str or not end_str:
+        return Response(
+            {'error': 'Укажите параметры start и end (YYYY-MM-DD).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if period not in ('daily', 'weekly', 'monthly'):
+        return Response(
+            {'error': 'period должен быть daily, weekly или monthly.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if mode not in ('actual', 'potential'):
+        return Response(
+            {'error': 'mode должен быть actual или potential.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        start = datetime.strptime(start_str, '%Y-%m-%d').date()
+        end = datetime.strptime(end_str, '%Y-%m-%d').date()
+    except ValueError:
+        return Response(
+            {'error': 'Некорректный формат даты. Используйте YYYY-MM-DD.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if start > end:
+        return Response(
+            {'error': 'Дата начала не может быть позже даты окончания.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(revenue_chart(request.user, start, end, period, mode))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def analytics_services_breakdown_view(request):
+    """
+    Распределение записей и дохода по услугам за период.
+    GET /api/analytics/services-breakdown/?start=YYYY-MM-DD&end=YYYY-MM-DD
+    """
+    require_pro_subscription(request.user)
+
+    start_str = request.query_params.get('start')
+    end_str = request.query_params.get('end')
+
+    if not start_str or not end_str:
+        return Response(
+            {'error': 'Укажите параметры start и end (YYYY-MM-DD).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        start = datetime.strptime(start_str, '%Y-%m-%d').date()
+        end = datetime.strptime(end_str, '%Y-%m-%d').date()
+    except ValueError:
+        return Response(
+            {'error': 'Некорректный формат даты. Используйте YYYY-MM-DD.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if start > end:
+        return Response(
+            {'error': 'Дата начала не может быть позже даты окончания.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(services_breakdown(request.user, start, end))
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def public_reviews_view(request, username):
     """
@@ -1008,7 +1174,10 @@ def public_reviews_view(request, username):
         return Response({
             'error': 'Пользователь не найден.'
         }, status=status.HTTP_404_NOT_FOUND)
-    
+
+    if user.show_public_reviews is False:
+        return Response([], status=status.HTTP_200_OK)
+
     queryset = Review.objects.filter(user=user).select_related('service', 'customer')
     
     serializer = ReviewSerializer(queryset.order_by('-created_at'), many=True, context={'request': request})

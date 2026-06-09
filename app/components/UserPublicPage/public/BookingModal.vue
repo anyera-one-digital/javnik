@@ -2,6 +2,8 @@
 import type { Event, Service } from '~/types'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { formatDurationMinutes } from '~/utils/formatDuration'
+import { onlyActiveServices } from '~/utils/activeServices'
 
 const props = defineProps<{
   modelValue?: boolean
@@ -44,9 +46,11 @@ const servicesUrl = props.username
   ? `/api/public/services/${props.username}`
   : '/api/services'
 
-const { data: services } = await useFetch<Service[]>(servicesUrl, {
+const { data: servicesData } = await useFetch<Service[]>(servicesUrl, {
   default: () => []
 })
+
+const services = computed(() => onlyActiveServices(servicesData.value))
 
 const selectedServiceId = ref<number | null>(null)
 
@@ -237,7 +241,7 @@ const modalDescription = computed(() => {
           />
         </UFormField>
 
-        <UFormField label="Email" required>
+        <UFormField label="Электронная почта" required>
           <UInput
             v-model="form.email"
             type="email"
@@ -280,7 +284,10 @@ const modalDescription = computed(() => {
               v-model="selectedServiceId"
               :items="[
                 { label: 'Выберите услугу', value: null },
-                ...(services || []).map(s => ({ label: `${s.name} (${s.duration} мин, ${s.price} ₽)`, value: s.id }))
+                ...(services || []).map(s => ({
+                  label: `${s.name} (${formatDurationMinutes(s.duration)}, ${s.price} ₽)`,
+                  value: s.id
+                }))
               ]"
               placeholder="Выберите услугу"
               required

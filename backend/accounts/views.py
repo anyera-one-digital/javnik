@@ -8,7 +8,15 @@ from django.core.cache import cache
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
-from .serializers import UserRegistrationSerializer, UserSerializer, LoginSerializer
+from .account_deletion import can_delete_account, count_active_bookings, delete_user_account
+from .serializers import (
+    UserRegistrationSerializer,
+    UserSerializer,
+    LoginSerializer,
+    RegisterCredentialsSerializer,
+    DeleteAccountSerializer,
+)
+from .subscription import build_subscription_payload
 import hashlib
 
 User = get_user_model()
@@ -96,7 +104,7 @@ def verify_email_view(request):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             },
-            'message': 'Регистрация завершена.',
+            'message': 'Email подтверждён. Установите пароль.',
         }, status=status.HTTP_200_OK)
 
     cache_key = f'email_verify_{hashlib.sha256(email.encode()).hexdigest()}'
@@ -128,8 +136,27 @@ def verify_email_view(request):
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         },
-        'message': 'Регистрация завершена.',
+        'message': 'Email подтверждён. Установите пароль.',
     }, status=status.HTTP_200_OK)
+
+
+class RegisterCredentialsView(generics.GenericAPIView):
+    """
+    Установка пароля после подтверждения email (шаг 3 регистрации).
+    POST /api/auth/register/credentials/
+    Только для пользователя с ещё не заданным паролем (согласия принимаются на шаге регистрации).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RegisterCredentialsSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({
+            'message': 'Пароль установлен.',
+            'user': UserSerializer(request.user, context={'request': request}).data,
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -240,6 +267,16 @@ def user_profile_view(request):
     """
     serializer = UserSerializer(request.user, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def subscription_view(request):
+    """
+    Текущая подписка и лимиты тарифа.
+    GET /api/auth/subscription/
+    """
+    return Response(build_subscription_payload(request.user), status=status.HTTP_200_OK)
 
 
 @api_view(['PUT', 'PATCH'])
@@ -474,4 +511,66 @@ def password_reset_confirm_view(request):
     
     return Response({
         'message': 'Пароль успешно изменен.'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def account_deletion_status_view(request):
+    """
+    Проверка возможности удаления аккаунта.
+    GET /api/auth/account/deletion-status/
+    """
+    user = request.user
+    active_count = count_active_bookings(user)
+    return Response({
+        'canDelete': active_count == 0,
+        'activeBookingsCount': active_count,
+        'username': user.username,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_account_view(request):
+    """
+    Полное удаление аккаунта и всех связанных данных.
+    POST /api/auth/account/delete/
+    Body: { "username": "your_username" }
+    """
+    serializer = DeleteAccountSerializer(
+        data=request.data,
+        context={'request': request},
+    )
+    serializer.is_valid(raise_exception=True)
+
+    user = request.user
+
+    if not can_delete_account(user):
+        return Response({
+            'error': (
+                'Нельзя удалить аккаунт, пока есть активные записи '
+                '(ожидают подтверждения или подтверждены). '
+                'Завершите или отмените их в расписании.'
+            ),
+            'code': 'active_bookings',
+            'activeBookingsCount': count_active_bookings(user),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        delete_user_account(user)
+    except ValueError as exc:
+        if str(exc) == 'active_bookings':
+            return Response({
+                'error': (
+                    'Нельзя удалить аккаунт, пока есть активные записи '
+                    '(ожидают подтверждения или подтверждены).'
+                ),
+                'code': 'active_bookings',
+                'activeBookingsCount': count_active_bookings(user),
+            }, status=status.HTTP_400_BAD_REQUEST)
+        raise
+
+    return Response({
+        'message': 'Аккаунт и все связанные данные удалены.',
     }, status=status.HTTP_200_OK)

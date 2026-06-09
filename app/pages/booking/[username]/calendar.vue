@@ -2,13 +2,14 @@
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameDay, startOfDay, parse } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { formatWeekdayShort } from '~/utils'
+import { computeWorkTimeRange } from '~/utils/workTimeRange'
 import type { Event, Service, User, Booking, WorkSchedule } from '~/types'
 import BookingModal from '~/components/UserPublicPage/public/BookingModal.vue'
+import PublicPageFooter from '~/components/UserPublicPage/PublicPageFooter.vue'
 
 definePageMeta({
   layout: false,
   middleware: ['public-page-color-mode']
-  // Не используем middleware subdomain здесь, чтобы избежать конфликтов
 })
 
 const route = useRoute()
@@ -37,15 +38,15 @@ const loadUserProfile = async () => {
   userError.value = null
   
   try {
-    const apiUrl = `/api/public/profile/${username.value}`
-    console.log('Loading user profile from:', apiUrl)
-    
-    const response = await $fetch<User>(apiUrl)
+    const response = await $fetch<User>(`/api/public/profile/${username.value}`)
+
+    if (response.show_public_schedule === false) {
+      await navigateTo(`/booking/${username.value}`, { replace: true })
+      return
+    }
+
     publicUser.value = response
-    console.log('User profile loaded:', response)
-    console.log('Avatar URL:', response.avatar_url)
-    console.log('Avatar field:', response.avatar)
-    
+
     // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
       const config = useRuntimeConfig()
@@ -56,7 +57,6 @@ const loadUserProfile = async () => {
         // Извлекаем путь из URL
         const urlPath = response.avatar_url.replace(/^https?:\/\/[^\/]+/, '')
         publicUser.value.avatar_url = `${baseUrl}${urlPath}`
-        console.log('Fixed avatar URL (replaced backend):', publicUser.value.avatar_url)
       } else if (!response.avatar_url.startsWith('http')) {
         // Если URL не полный, формируем его
         if (response.avatar_url.startsWith('/')) {
@@ -64,7 +64,6 @@ const loadUserProfile = async () => {
         } else {
           publicUser.value.avatar_url = `${baseUrl}/${response.avatar_url}`
         }
-        console.log('Fixed avatar URL (added base):', publicUser.value.avatar_url)
       }
     }
   } catch (error: any) {
@@ -81,31 +80,14 @@ const loadUserProfile = async () => {
 
 // Загружаем профиль при монтировании компонента
 onMounted(() => {
-  console.log('=== CALENDAR.VUE MOUNTED ===')
-  console.log('Route path:', route.path)
-  console.log('Route params:', route.params)
-  console.log('Username:', username.value)
-  console.log('Loading profile for:', username.value)
   loadUserProfile()
 })
 
 // Флаг загрузки данных (объявляем до watch, который его использует)
 const dataLoading = ref(false)
 
-// Логируем изменения состояний
-watch([userPending, dataLoading, publicUser, userError], ([pending, loading, user, error]) => {
-  console.log('Calendar states:', {
-    userPending: pending,
-    dataLoading: loading,
-    hasUser: !!user,
-    hasError: !!error
-  })
-}, { immediate: true })
-
-// Перезагружаем при изменении username
 watch(() => username.value, (newUsername) => {
   if (newUsername) {
-    console.log('Username changed, reloading profile:', newUsername)
     loadUserProfile()
   }
 })
@@ -121,6 +103,24 @@ function parseDateFromQuery(dateStr: string | undefined): Date {
 }
 
 const viewMode = ref<'day' | 'week'>('week')
+
+const isScheduleMobile = useMediaQuery('(max-width: 767px)')
+const weekViewBeforeMobile = ref<'day' | 'week' | null>(null)
+watch(isScheduleMobile, (mobile) => {
+  if (import.meta.server) return
+  if (mobile) {
+    if (viewMode.value === 'week') {
+      weekViewBeforeMobile.value = 'week'
+    } else {
+      weekViewBeforeMobile.value = null
+    }
+    viewMode.value = 'day'
+  } else if (weekViewBeforeMobile.value === 'week') {
+    viewMode.value = 'week'
+    weekViewBeforeMobile.value = null
+  }
+}, { immediate: true })
+
 const selectedDate = ref<Date>(route.query.date ? parseDateFromQuery(route.query.date as string) : startOfDay(new Date()))
 const selectedEvent = ref<Event | null>(null)
 const selectedService = ref<Service | null>(null)
@@ -141,48 +141,24 @@ const workSchedules = ref<Map<string, WorkSchedule>>(new Map())
 // Загружаем все данные только если пользователь найден
 const loadAllData = async () => {
   if (!publicUser.value || userError.value) {
-    console.log('Cannot load data: user not loaded or error exists')
     return
   }
 
-  console.log('Loading all data for calendar...')
-  
   try {
-    // Загружаем события
     let eventsUrl = `/api/public/events/${username.value}`
     if (viewMode.value === 'day') {
       eventsUrl += `?date=${format(selectedDate.value, 'yyyy-MM-dd')}`
     }
-    console.log('Loading events from:', eventsUrl)
     const eventsData = await $fetch<any>(eventsUrl)
     allEvents.value = Array.isArray(eventsData) ? eventsData : []
-    console.log('Events loaded:', allEvents.value.length)
-    
-    // Загружаем услуги
-    const servicesUrl = `/api/public/services/${username.value}`
-    console.log('Loading services from:', servicesUrl)
-    const servicesData = await $fetch<any>(servicesUrl)
+
+    const servicesData = await $fetch<any>(`/api/public/services/${username.value}`)
     services.value = Array.isArray(servicesData) ? servicesData : []
-    console.log('Services loaded:', services.value.length)
-    
-    // Загружаем бронирования
-    console.log('Loading bookings...')
+
     await loadBookings()
-    console.log('Bookings loaded')
-    
-    // Загружаем график работы
-    console.log('Loading work schedules...')
     await loadWorkSchedules()
-    console.log('Work schedules loaded')
-    
-    console.log('All data loaded successfully')
   } catch (error: any) {
-    console.error('Error loading data:', error)
-    console.error('Error details:', {
-      status: error.statusCode || error.status,
-      message: error.message,
-      data: error.data
-    })
+    console.error('Error loading calendar data:', error)
     allEvents.value = []
     services.value = []
     bookings.value = []
@@ -261,12 +237,13 @@ async function loadWorkSchedules() {
     const response = await $fetch<WorkSchedule[]>(url)
     
     if (Array.isArray(response)) {
-      workSchedules.value.clear()
-      response.forEach(schedule => {
-        if (schedule && schedule.date) {
-          workSchedules.value.set(schedule.date, schedule)
+      const next = new Map<string, WorkSchedule>()
+      for (const schedule of response) {
+        if (schedule?.date) {
+          next.set(schedule.date, schedule)
         }
-      })
+      }
+      workSchedules.value = next
     }
   } catch (error) {
     console.error('Error loading work schedules:', error)
@@ -279,12 +256,10 @@ let isInitialLoad = true
 // Загружаем данные когда пользователь найден
 watch([publicUser, userError], ([user, error]) => {
   if (user && !error && !dataLoading.value) {
-    console.log('User loaded, starting data load...')
     dataLoading.value = true
     isInitialLoad = false
     loadAllData().finally(() => {
       dataLoading.value = false
-      console.log('Data load completed')
     })
   }
 }, { immediate: true })
@@ -298,7 +273,6 @@ watch([viewMode, selectedDate], () => {
   }
   
   if (publicUser.value && !userError.value && !dataLoading.value) {
-    console.log('View mode or date changed, reloading data...')
     dataLoading.value = true
     loadAllData().finally(() => {
       dataLoading.value = false
@@ -330,40 +304,13 @@ function getEventsForDate(date: Date): Event[] {
   return allEvents.value.filter(e => e.date === dateStr)
 }
 
-// Вычисляем минимальное и максимальное рабочее время из всех графиков (как во внутреннем расписании)
 const workTimeRange = computed(() => {
-  if (workSchedules.value.size === 0) {
-    return { minHour: 9, maxHour: 21 }
-  }
-  
-  let minHour: number | null = null
-  let maxHour: number | null = null
-  let maxEndMinute: number = 0
-  
-  for (const schedule of workSchedules.value.values()) {
-    if (schedule.type === 'workday' && schedule.startTime && schedule.endTime) {
-      const [startHour] = schedule.startTime.split(':').map(Number)
-      const [endHour, endMinute = 0] = schedule.endTime.split(':').map(Number)
-      
-      if (minHour === null || startHour < minHour) {
-        minHour = startHour
-      }
-      
-      const endMinutes = endHour * 60 + endMinute
-      const currentMaxMinutes = maxHour !== null ? maxHour * 60 + maxEndMinute : 0
-      if (maxHour === null || endMinutes > currentMaxMinutes) {
-        maxHour = endHour
-        maxEndMinute = endMinute
-      }
-    }
-  }
-  
-  if (minHour === null || maxHour === null) {
-    return { minHour: 9, maxHour: 21 }
-  }
-  
-  const maxDisplayHour = maxEndMinute === 0 ? maxHour - 1 : maxHour
-  return { minHour, maxHour: Math.max(minHour, maxDisplayHour) }
+  const bookingsList = viewMode.value === 'week' ? allBookings.value : bookings.value
+  return computeWorkTimeRange(
+    workSchedules.value.values(),
+    bookingsList,
+    allEvents.value
+  )
 })
 
 const dayHours = computed(() => {
@@ -495,6 +442,14 @@ function getBookingDuration(booking: Booking): number {
   return endMinutes - startMinutes
 }
 
+function isShortBookingBlock(booking: Booking): boolean {
+  return getBookingDuration(booking) < 45
+}
+
+function isShortEventBlock(event: Event): boolean {
+  return event.duration < 45
+}
+
 function getEventPosition(event: Event, date: Date): { top: string, height: string } {
   const [startHour, startMinute] = event.startTime.split(':').map(Number)
   const startMinutes = startHour * 60 + startMinute
@@ -539,16 +494,16 @@ function getUnavailableTimeBlocks(date: Date): Array<{ start: number, end: numbe
   
   const { minHour, maxHour } = workTimeRange.value
   const displayStartMinutes = minHour * 60
-  const displayEndMinutes = maxHour * 60
-  
+  const displayEndMinutes = (maxHour + 1) * 60
+
   if (!schedule) {
     return blocks
   }
-  
+
   if (schedule.type !== 'workday') {
     return [{ start: displayStartMinutes, end: displayEndMinutes }]
   }
-  
+
   if (!schedule.startTime || !schedule.endTime) {
     return [{ start: displayStartMinutes, end: displayEndMinutes }]
   }
@@ -595,24 +550,24 @@ function getUnavailableTimePosition(startHour: number, startMinute: number, endH
   
   const { minHour, maxHour } = workTimeRange.value
   const dayStartMinutes = minHour * 60
-  const dayEndMinutes = maxHour * 60
-  
+  const dayEndMinutes = (maxHour + 1) * 60
+
   const clampedStartMinutes = Math.max(startMinutes, dayStartMinutes)
   const clampedEndMinutes = Math.min(endMinutes, dayEndMinutes)
-  
+
   if (clampedStartMinutes >= clampedEndMinutes) {
     return { top: '0px', height: '0px' }
   }
-  
+
   const relativeStart = clampedStartMinutes - dayStartMinutes
   const duration = clampedEndMinutes - clampedStartMinutes
-  
+
   const HOUR_HEIGHT_PX = 48
   const MINUTE_HEIGHT_PX = HOUR_HEIGHT_PX / 60
-  
+
   const topPx = (relativeStart * MINUTE_HEIGHT_PX)
   const heightPx = (duration * MINUTE_HEIGHT_PX)
-  
+
   return {
     top: `${topPx}px`,
     height: `${heightPx}px`
@@ -657,8 +612,18 @@ function navigateDate(direction: 'prev' | 'next') {
   })
 }
 
+function navigateDay(direction: 'prev' | 'next') {
+  selectedDate.value = addDays(selectedDate.value, direction === 'prev' ? -1 : 1)
+  router.push({
+    query: {
+      ...route.query,
+      date: format(selectedDate.value, 'yyyy-MM-dd')
+    }
+  })
+}
+
 function goToToday() {
-  selectedDate.value = new Date()
+  selectedDate.value = startOfDay(new Date())
   router.push({
     query: {
       ...route.query,
@@ -695,14 +660,14 @@ watch([publicUser, userError], ([user, error]) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background">
-    <div v-if="userPending || dataLoading" class="flex items-center justify-center min-h-screen">
+  <div class="min-h-screen bg-background flex flex-col">
+    <div v-if="userPending || dataLoading" class="flex flex-1 items-center justify-center">
       <div class="text-center space-y-4">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-muted mx-auto"></div>
         <p class="text-muted">{{ userPending ? 'Загрузка профиля...' : 'Загрузка календаря...' }}</p>
       </div>
     </div>
-    <div v-else-if="userError && !publicUser" class="flex items-center justify-center min-h-screen p-4">
+    <div v-else-if="userError && !publicUser" class="flex flex-1 items-center justify-center p-4">
     <UPageCard variant="subtle" class="max-w-md w-full">
       <div class="text-center space-y-4">
         <div class="text-6xl">😕</div>
@@ -718,11 +683,11 @@ watch([publicUser, userError], ([user, error]) => {
       </div>
     </UPageCard>
   </div>
-  <UDashboardPanel v-else id="schedule" class="h-screen flex flex-col">
+  <UDashboardPanel v-else id="schedule" class="flex-1 min-h-0 flex flex-col" :ui="{ body: 'max-md:px-0 md:px-4' }">
     <template #header>
-      <UDashboardNavbar>
+      <UDashboardNavbar :toggle="false">
         <template #leading>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
             <UButton
               icon="i-lucide-arrow-left"
               color="neutral"
@@ -730,43 +695,44 @@ watch([publicUser, userError], ([user, error]) => {
               size="sm"
               square
               :to="`/booking/${username}`"
-              class="shrink-0"
+              class="shrink-0 [&_svg]:!size-[19px]"
+              aria-label="К профилю"
             />
-            <div v-if="publicUser" class="flex items-center gap-3">
+
+            <div v-if="publicUser" class="flex items-center gap-2 min-w-0 flex-1 md:gap-3 md:flex-none md:shrink-0">
               <UAvatar
                 :src="publicUser.avatar_url || null"
                 :alt="displayName"
-                size="md"
+                size="sm"
+                class="shrink-0"
               >
                 <template v-if="displayName" #fallback>
                   {{ displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) }}
                 </template>
               </UAvatar>
-              <span class="text-lg font-semibold">{{ displayName }}</span>
+              <span class="text-sm font-semibold truncate md:text-lg md:max-w-[200px]">{{ displayName }}</span>
             </div>
-            <div v-else-if="userError" class="flex items-center gap-3">
-              <UAvatar
-                alt="Ошибка"
-                size="md"
-              />
-              <span class="text-lg font-semibold text-red-500">Пользователь не найден</span>
+            <div v-else-if="userError" class="flex items-center gap-2 min-w-0 flex-1 md:gap-3 md:flex-none md:shrink-0">
+              <UAvatar alt="Ошибка" size="sm" class="shrink-0" />
+              <span class="text-base font-semibold text-red-500 truncate md:text-lg">Пользователь не найден</span>
             </div>
-            <div v-else class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-gray-200 animate-pulse"></div>
-              <div class="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+            <div v-else class="flex items-center gap-2 min-w-0 flex-1 md:gap-3 md:flex-none md:shrink-0">
+              <div class="size-8 shrink-0 rounded-full bg-gray-200 animate-pulse md:size-10" />
+              <div class="h-5 flex-1 max-w-[160px] rounded bg-gray-200 animate-pulse md:max-w-[200px]" />
             </div>
 
-            <!-- Переключатель недель/дней (слева, как в ЛК) -->
-            <div class="flex items-center gap-1 ml-2">
+            <!-- Переключатель даты в шапке — только desktop; на мобиле дни выбираются в полоске недели -->
+            <div class="hidden md:flex items-center gap-1 min-w-0 flex-1">
               <UButton
                 icon="i-lucide-chevron-left"
                 color="neutral"
                 variant="ghost"
                 square
                 size="sm"
+                class="shrink-0"
                 @click="navigateDate('prev')"
               />
-              <span class="text-sm font-medium px-2">
+              <span class="text-sm font-medium px-1 truncate md:px-2">
                 {{ viewMode === 'day' ? format(selectedDate, 'd MMMM, EEEE', { locale: ru }) : `Неделя ${format(weekStart, 'd MMM', { locale: ru })} - ${format(weekEnd, 'd MMM', { locale: ru })}` }}
               </span>
               <UButton
@@ -775,6 +741,7 @@ watch([publicUser, userError], ([user, error]) => {
                 variant="ghost"
                 square
                 size="sm"
+                class="shrink-0"
                 @click="navigateDate('next')"
               />
             </div>
@@ -801,6 +768,7 @@ watch([publicUser, userError], ([user, error]) => {
             />
 
             <UTabs
+              v-show="!isScheduleMobile"
               v-model="viewMode"
               :items="[
                 { label: 'День', value: 'day' },
@@ -853,32 +821,30 @@ watch([publicUser, userError], ([user, error]) => {
       </div>
       
       <!-- Календарь -->
-      <div v-else-if="publicUser" class="flex-1 min-h-0 pb-4" style="padding-bottom: 16px;">
+      <div v-else-if="publicUser" class="flex-1 min-h-0 overflow-auto">
         <!-- Дневной вид -->
         <div v-if="viewMode === 'day'" class="relative h-full">
-          <!-- Мини-календарь дней недели -->
+          <!-- Мини-календарь дней недели (на мобиле без пустой колонки под шкалу времени) -->
           <div class="flex border-b border-default mb-2">
-            <div class="w-16 shrink-0 border-r border-default/30"></div>
-            <div class="flex-1 flex items-center">
-              <!-- Кнопка переключения назад -->
+            <div class="hidden md:block w-16 shrink-0 border-r border-default/30" />
+            <div class="flex-1 flex items-center min-w-0 max-md:pl-0 max-md:pr-0">
               <UButton
                 icon="i-lucide-chevron-left"
                 color="neutral"
                 variant="ghost"
                 size="sm"
                 square
-                @click="navigateDate('prev')"
-                class="shrink-0 mx-1"
+                class="shrink-0 max-md:mx-0.5 md:mx-1"
+                @click="navigateDay('prev')"
               />
-              
-              <!-- Дни недели -->
-              <div class="flex-1 grid grid-cols-7">
+
+              <div class="flex-1 min-w-0 grid grid-cols-7">
                 <div
                   v-for="(day, index) in dayViewWeekDays"
                   :key="day.getTime()"
-                  class="p-2 text-center cursor-pointer transition-colors"
+                  class="p-1.5 md:p-2 text-center cursor-pointer transition-colors"
                   :class="{
-                    'bg-muted/50': isSameDay(day, selectedDate),
+                    'bg-gray-900/10 dark:bg-white/10': isSameDay(day, selectedDate),
                     'hover:bg-elevated/50': !isSameDay(day, selectedDate),
                     'border-l border-default': index > 0
                   }"
@@ -888,55 +854,51 @@ watch([publicUser, userError], ([user, error]) => {
                   <div class="text-sm font-medium">{{ format(day, 'd') }}</div>
                 </div>
               </div>
-              
-              <!-- Кнопка переключения вперед -->
+
               <UButton
                 icon="i-lucide-chevron-right"
                 color="neutral"
                 variant="ghost"
                 size="sm"
                 square
-                @click="navigateDate('next')"
-                class="shrink-0 mx-1"
+                class="shrink-0 max-md:mx-0.5 md:mx-1"
+                @click="navigateDay('next')"
               />
             </div>
           </div>
 
-          <div class="flex">
-            <!-- Временная шкала (формат как на референсе: 10 00, 30) -->
-            <div class="w-16 shrink-0 pt-12 border-r border-default/30" style="padding-top: 3rem;">
+          <div class="flex min-w-0 max-md:pl-0">
+            <!-- Временная шкала -->
+            <div class="w-12 shrink-0 border-r border-default/30 md:w-16">
               <div
                 v-for="hour in dayHours"
                 :key="hour"
-                class="relative flex flex-col items-end pr-2 text-muted"
+                class="relative flex flex-col items-end pr-1 text-muted md:pr-2"
                 style="height: 48px; min-height: 48px; max-height: 48px; box-sizing: border-box;"
               >
                 <div class="flex items-baseline gap-0.5" style="padding-top: 2px;">
                   <span class="text-sm font-medium">{{ String(hour).padStart(2, '0') }}</span>
                   <span class="text-[10px] -translate-y-0.5">00</span>
                 </div>
-                <span class="text-[10px] absolute right-2" style="top: 24px;">30</span>
+                <span class="text-[10px] absolute max-md:right-1 md:right-2" style="top: 24px;">30</span>
               </div>
             </div>
 
             <!-- Расписание -->
-            <div class="flex-1 relative pt-12" style="padding-top: 3rem; padding-left: 1rem; padding-right: 1rem;">
+            <div class="flex-1 relative min-w-0 px-1.5 md:px-4">
               <div
                 v-for="hour in dayHours"
                 :key="hour"
                 class="border-b border-default relative"
                 style="height: 48px; min-height: 48px; max-height: 48px; box-sizing: border-box; margin: 0;"
               >
-                <!-- Полчаса (30 минут) -->
                 <div class="absolute left-0 right-0 border-t border-dashed border-default/50" style="top: 24px; height: 0; box-sizing: border-box;" />
-                <!-- 15 минут -->
                 <div class="absolute left-0 right-0 border-t border-dashed border-default/30 opacity-50" style="top: 12px; height: 0; box-sizing: border-box;" />
-                <!-- 45 минут -->
                 <div class="absolute left-0 right-0 border-t border-dashed border-default/30 opacity-50" style="top: 36px; height: 0; box-sizing: border-box;" />
               </div>
 
               <!-- Недоступное время (блоки на основе графика работы) -->
-              <div class="absolute pointer-events-none" style="top: 3rem; left: 1rem; right: 1rem; bottom: 0;">
+              <div class="absolute inset-0 pointer-events-none">
                 <template
                   v-for="block in getUnavailableTimeBlocks(selectedDate)"
                   :key="`unavailable-${block.start}-${block.end}`"
@@ -954,22 +916,26 @@ watch([publicUser, userError], ([user, error]) => {
               </div>
 
               <!-- Бронирования -->
-              <div class="absolute" style="top: 3rem; left: 1rem; right: 1rem; bottom: 0;">
+              <div class="absolute inset-0 z-20 pointer-events-none">
                 <div
                   v-for="booking in getBookingsForDate(selectedDate)"
                   :key="booking.id"
-                  class="absolute left-2 right-2 rounded-md text-white text-sm cursor-pointer hover:opacity-90 transition-opacity"
+                  class="absolute left-2 right-2 flex flex-col overflow-hidden rounded-md text-white text-sm cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"
                   :style="{ ...getBookingPosition(booking, selectedDate), boxSizing: 'border-box', maxHeight: '100%' }"
                   :class="[
                     getBookingColorClass(booking),
                     {
-                      'p-2': getBookingDuration(booking) > 30,
-                      'p-1.5': getBookingDuration(booking) === 30
+                      'p-2': !isShortBookingBlock(booking),
+                      'px-1.5 py-0.5': isShortBookingBlock(booking)
                     }
                   ]"
                 >
-                  <div v-if="getBookingDuration(booking) === 30" class="font-medium truncate text-xs leading-tight">
-                    {{ booking.startTime }} Забронировано
+                  <div
+                    v-if="isShortBookingBlock(booking)"
+                    class="flex min-h-0 min-w-0 flex-1 items-center gap-1.5"
+                  >
+                    <span class="shrink-0 text-[10px] font-medium tabular-nums leading-none sm:text-xs">{{ booking.startTime }}</span>
+                    <span class="min-w-0 flex-1 truncate text-xs font-medium leading-tight">Забронировано</span>
                   </div>
                   <template v-else>
                     <div class="font-medium truncate">{{ booking.startTime }} Забронировано</div>
@@ -978,19 +944,29 @@ watch([publicUser, userError], ([user, error]) => {
               </div>
 
               <!-- События -->
-              <div class="absolute" style="top: 3rem; left: 1rem; right: 1rem; bottom: 0;">
+              <div class="absolute inset-0 z-20 pointer-events-none">
                 <div
                   v-for="event in getEventsForDate(selectedDate)"
                   :key="`event-${event.id}`"
-                  class="absolute left-2 right-2 rounded-md p-2 bg-purple-500 text-white text-sm cursor-pointer hover:opacity-90 transition-opacity border-2 border-purple-600"
+                  class="absolute left-2 right-2 flex flex-col overflow-hidden rounded-md bg-purple-500 text-white text-sm cursor-pointer hover:opacity-90 transition-opacity border-2 border-purple-600 pointer-events-auto"
                   :style="{ ...getEventPosition(event, selectedDate), boxSizing: 'border-box' }"
+                  :class="isShortEventBlock(event) ? 'px-1.5 py-0.5' : 'p-2'"
                   @click.stop="openBookingModal(event)"
                 >
-                  <div class="font-medium">{{ event.startTime }} {{ event.name }}</div>
-                  <div class="text-xs opacity-90">
-                    <span v-if="event.serviceId">{{ getServiceName(event.serviceId) }}</span>
-                    <span class="ml-2">{{ event.bookedSlots }}/{{ event.maxParticipants }} мест</span>
+                  <div
+                    v-if="isShortEventBlock(event)"
+                    class="flex min-h-0 min-w-0 flex-1 items-center gap-1.5"
+                  >
+                    <span class="shrink-0 text-[10px] font-medium tabular-nums leading-none sm:text-xs">{{ event.startTime }}</span>
+                    <span class="min-w-0 flex-1 truncate text-xs font-medium leading-tight">{{ event.name }}</span>
                   </div>
+                  <template v-else>
+                    <div class="font-medium">{{ event.startTime }} {{ event.name }}</div>
+                    <div class="text-xs opacity-90">
+                      <span v-if="event.serviceId">{{ getServiceName(event.serviceId) }}</span>
+                      <span class="ml-2">{{ event.bookedSlots }}/{{ event.maxParticipants }} мест</span>
+                    </div>
+                  </template>
                 </div>
               </div>
 
@@ -998,7 +974,7 @@ watch([publicUser, userError], ([user, error]) => {
               <div
                 v-if="currentTimeIndicatorVisible && currentTimeTopPx >= 0"
                 class="absolute left-0 right-0 pointer-events-none z-10 flex items-center"
-                :style="{ top: `calc(3rem + ${currentTimeTopPx}px)` }"
+                :style="{ top: `${currentTimeTopPx}px` }"
               >
                 <span class="bg-gray-700 dark:bg-gray-600 text-white text-[10px] px-1.5 py-0.5 rounded shrink-0 -translate-y-1/2">{{ currentTimeFormatted }}</span>
                 <div class="flex-1 h-px bg-gray-600 dark:bg-gray-500 -translate-y-1/2" />
@@ -1082,18 +1058,19 @@ watch([publicUser, userError], ([user, error]) => {
                     <div
                       v-for="booking in getBookingsForDate(day)"
                       :key="booking.id"
-                      class="absolute left-1 right-1 rounded-md text-white text-xs cursor-pointer hover:opacity-90 transition-opacity"
+                      class="absolute left-1 right-1 flex flex-col overflow-hidden rounded-md text-white text-xs cursor-pointer hover:opacity-90 transition-opacity"
                       :style="{ ...getBookingPosition(booking, day), boxSizing: 'border-box', maxHeight: '100%' }"
                       :class="[
                         getBookingColorClass(booking),
-                        {
-                          'p-1.5': getBookingDuration(booking) <= 30,
-                          'p-2': getBookingDuration(booking) > 30
-                        }
+                        isShortBookingBlock(booking) ? 'px-1 py-0.5' : 'p-1.5'
                       ]"
                     >
-                      <div v-if="getBookingDuration(booking) <= 30" class="font-medium truncate text-xs leading-tight">
-                        {{ booking.startTime }} Забронировано
+                      <div
+                        v-if="isShortBookingBlock(booking)"
+                        class="flex min-h-0 min-w-0 flex-1 items-center gap-1"
+                      >
+                        <span class="shrink-0 text-[9px] font-medium tabular-nums leading-none">{{ booking.startTime }}</span>
+                        <span class="min-w-0 flex-1 truncate font-medium leading-tight">Забронировано</span>
                       </div>
                       <template v-else>
                         <div class="font-medium truncate text-xs">{{ booking.startTime }} Забронировано</div>
@@ -1106,14 +1083,24 @@ watch([publicUser, userError], ([user, error]) => {
                     <div
                       v-for="event in getEventsForDate(day)"
                       :key="`event-${event.id}`"
-                      class="absolute left-1 right-1 rounded-md p-1.5 bg-purple-500 text-white text-xs cursor-pointer hover:opacity-90 transition-opacity border border-purple-600"
+                      class="absolute left-1 right-1 flex flex-col overflow-hidden rounded-md bg-purple-500 text-white text-xs cursor-pointer hover:opacity-90 transition-opacity border border-purple-600"
                       :style="{ ...getEventPosition(event, day), boxSizing: 'border-box' }"
+                      :class="isShortEventBlock(event) ? 'px-1 py-0.5' : 'p-1.5'"
                       @click.stop="openBookingModal(event)"
                     >
-                      <div class="font-medium truncate">{{ event.startTime }} {{ event.name }}</div>
-                      <div class="truncate text-xs/90">
-                        <span v-if="event.serviceId">{{ getServiceName(event.serviceId) }}</span>
+                      <div
+                        v-if="isShortEventBlock(event)"
+                        class="flex min-h-0 min-w-0 flex-1 items-center gap-1"
+                      >
+                        <span class="shrink-0 text-[9px] font-medium tabular-nums leading-none">{{ event.startTime }}</span>
+                        <span class="min-w-0 flex-1 truncate font-medium leading-tight">{{ event.name }}</span>
                       </div>
+                      <template v-else>
+                        <div class="font-medium truncate">{{ event.startTime }} {{ event.name }}</div>
+                        <div class="truncate text-xs/90">
+                          <span v-if="event.serviceId">{{ getServiceName(event.serviceId) }}</span>
+                        </div>
+                      </template>
                     </div>
 
                     <!-- Индикатор текущего времени (только для сегодня) -->
@@ -1134,6 +1121,8 @@ watch([publicUser, userError], ([user, error]) => {
       </div>
     </template>
   </UDashboardPanel>
+
+  <PublicPageFooter />
   </div>
 
   <!-- Booking Modal (только если пользователь загружен) -->

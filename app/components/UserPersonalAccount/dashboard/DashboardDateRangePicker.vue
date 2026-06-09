@@ -2,11 +2,15 @@
 import { DateFormatter, getLocalTimeZone, CalendarDate, today } from '@internationalized/date'
 import type { Range } from '~/types'
 
-const df = new DateFormatter('en-US', {
+const df = new DateFormatter('ru-RU', {
   dateStyle: 'medium'
 })
 
 const selected = defineModel<Range>({ required: true })
+
+defineProps<{
+  disabled?: boolean
+}>()
 
 const ranges = [
   { label: 'Последние 7 дней', days: 7 },
@@ -78,14 +82,22 @@ const selectRange = (range: { days?: number, months?: number, years?: number }) 
 </script>
 
 <template>
-  <UPopover :content="{ align: 'start' }" :modal="true">
+  <UPopover
+    :content="{ align: 'start' }"
+    :modal="true"
+    :disabled="disabled"
+  >
     <UButton
       color="neutral"
       variant="ghost"
       icon="i-lucide-calendar"
       class="data-[state=open]:bg-elevated group"
+      :disabled="disabled"
     >
-      <span class="truncate">
+      <span class="truncate sm:hidden">
+        Выбрать период
+      </span>
+      <span class="truncate hidden sm:inline">
         <template v-if="selected.start">
           <template v-if="selected.end">
             {{ df.format(selected.start) }} - {{ df.format(selected.end) }}
@@ -125,6 +137,7 @@ const selectRange = (range: { days?: number, months?: number, years?: number }) 
           class="p-2"
           color="neutral"
           :number-of-months="2"
+          :week-starts-on="1"
           range
         />
       </div>

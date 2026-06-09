@@ -4,6 +4,8 @@ import { format } from 'date-fns'
 import { CalendarDate, DateFormatter, getLocalTimeZone, today } from '@internationalized/date'
 import ServiceModal from '~/components/UserPersonalAccount/services/ServiceModal.vue'
 import CustomersAddModal from '~/components/UserPersonalAccount/customers/AddModal.vue'
+import { formatDurationMinutes } from '~/utils/formatDuration'
+import { onlyActiveServices } from '~/utils/activeServices'
 
 const dateFormatter = new DateFormatter('ru-RU', { dateStyle: 'long' })
 
@@ -37,9 +39,16 @@ const servicesError = ref<Error | null>(null)
 const workScheduleForDate = ref<WorkSchedule | null>(null)
 const bookingsForDate = ref<Booking[]>([])
 
+/** Как на бэкенде при проверке конфликтов: cancelled/completed не занимают слот */
+function bookingOccupiesSlotForConflict(b: Booking): boolean {
+  const s = b.status
+  if (s === 'cancelled' || s === 'completed') return false
+  return true
+}
+
 // При редактировании исключаем текущую запись из занятых слотов
 const bookingsExcludingCurrent = computed(() => {
-  const list = bookingsForDate.value
+  const list = bookingsForDate.value.filter(bookingOccupiesSlotForConflict)
   if (!props.editBooking?.id) return list
   return list.filter(b => b.id !== props.editBooking!.id)
 })
@@ -137,13 +146,11 @@ async function loadServices() {
         headers
       })
       
-      // Убеждаемся, что data - это массив
       if (Array.isArray(data)) {
-        services.value = [...data] // Создаем новый массив для реактивности
+        services.value = onlyActiveServices(data)
       } else if (data && typeof data === 'object' && 'results' in data) {
-        // Обработка пагинированного ответа
         const results = (data as any).results
-        services.value = Array.isArray(results) ? [...results] : []
+        services.value = onlyActiveServices(Array.isArray(results) ? results : [])
       } else {
         services.value = []
       }
@@ -163,12 +170,11 @@ async function loadServices() {
               headers
             })
             
-            // Убеждаемся, что retryData - это массив
             if (Array.isArray(retryData)) {
-              services.value = [...retryData] // Создаем новый массив для реактивности
+              services.value = onlyActiveServices(retryData)
             } else if (retryData && typeof retryData === 'object' && 'results' in retryData) {
               const results = (retryData as any).results
-              services.value = Array.isArray(results) ? [...results] : []
+              services.value = onlyActiveServices(Array.isArray(results) ? results : [])
             } else {
               services.value = []
             }
@@ -322,7 +328,7 @@ const serviceSelectItems = computed(() => {
     const serviceItems = services.value.map(s => {
       if (!s || !s.id) return null
       return { 
-        label: `${s.name || 'Без названия'} (${s.duration || 0} мин, ${Math.round(s.price || 0).toLocaleString('ru-RU')} ₽)`, 
+        label: `${s.name || 'Без названия'} (${formatDurationMinutes(s.duration || 0)}, ${Math.round(s.price || 0).toLocaleString('ru-RU')} ₽)`, 
         value: s.id 
       }
     }).filter(Boolean)
@@ -740,7 +746,7 @@ async function onSubmit() {
             <span class="font-medium">{{ selectedCustomer.name }}</span>
           </div>
           <div v-if="selectedCustomer.email" class="flex justify-between">
-            <span class="text-muted">Email:</span>
+            <span class="text-muted">Электронная почта:</span>
             <span class="font-medium">{{ selectedCustomer.email }}</span>
           </div>
           <div v-if="selectedCustomer.phone" class="flex justify-between">
@@ -780,7 +786,7 @@ async function onSubmit() {
         <div v-if="selectedService" class="p-3 bg-muted/30 rounded-lg text-sm">
           <div class="flex justify-between">
             <span class="text-muted">Продолжительность:</span>
-            <span class="font-medium">{{ selectedService.duration }} минут</span>
+            <span class="font-medium">{{ formatDurationMinutes(selectedService.duration) }}</span>
           </div>
         </div>
 

@@ -94,35 +94,6 @@ class ServiceImage(models.Model):
         return f'{self.service.name} - Изображение {self.order}'
 
 
-class Member(models.Model):
-    """
-    Модель сотрудника
-    """
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='members',
-        verbose_name='Владелец'
-    )
-    name = models.CharField(max_length=255, verbose_name='Имя')
-    email = models.EmailField(verbose_name='Email')
-    phone = models.CharField(max_length=20, blank=True, null=True, verbose_name='Телефон')
-    avatar = models.ImageField(upload_to='members/', blank=True, null=True, verbose_name='Аватар')
-    position = models.CharField(max_length=255, blank=True, null=True, verbose_name='Должность')
-    active = models.BooleanField(default=True, verbose_name='Активен')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
-
-    class Meta:
-        verbose_name = 'Сотрудник'
-        verbose_name_plural = 'Сотрудники'
-        ordering = ['-created_at']
-        unique_together = [['user', 'email']]
-
-    def __str__(self):
-        return self.name
-
-
 class Event(models.Model):
     """
     Модель события (групповое мероприятие)
@@ -140,14 +111,6 @@ class Event(models.Model):
         verbose_name='Услуга',
         blank=True,
         null=True
-    )
-    member = models.ForeignKey(
-        Member,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name='events',
-        verbose_name='Сотрудник'
     )
     name = models.CharField(max_length=255, verbose_name='Название')
     description = models.TextField(blank=True, null=True, verbose_name='Описание')
@@ -197,14 +160,6 @@ class Booking(models.Model):
         on_delete=models.CASCADE,
         related_name='bookings',
         verbose_name='Услуга'
-    )
-    member = models.ForeignKey(
-        Member,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name='bookings',
-        verbose_name='Сотрудник'
     )
     event = models.ForeignKey(
         Event,

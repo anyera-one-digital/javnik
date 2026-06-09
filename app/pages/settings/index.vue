@@ -5,7 +5,7 @@ definePageMeta({
 })
 
 // Редирект на первую вкладку настроек (профиль вынесен на отдельную страницу /profile)
-await navigateTo('/settings/notifications', { replace: true })
+await navigateTo('/settings/general', { replace: true })
 </script>
 
 <template>

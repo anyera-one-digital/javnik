@@ -15,7 +15,7 @@ const emit = defineEmits<{
 
 const schema = z.object({
   name: z.string().min(2, 'Слишком короткое'),
-  email: z.string().email('Неверный email'),
+  email: z.string().email('Неверный формат электронной почты'),
   phone: z.string().optional()
 })
 
@@ -118,7 +118,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField label="Имя" placeholder="Иван Иванов" name="name">
           <UInput v-model="state.name" class="w-full" />
         </UFormField>
-        <UFormField label="Email" placeholder="ivan.ivanov@example.com" name="email">
+        <UFormField label="Электронная почта" placeholder="ivan.ivanov@example.com" name="email">
           <UInput v-model="state.email" class="w-full" />
         </UFormField>
         <UFormField label="Телефон (необязательно)" placeholder="+7 (999) 999-99-99" name="phone">

@@ -27,6 +27,10 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
   label: userDisplayName.value,
   avatar: userAvatar.value ? { src: userAvatar.value, alt: userDisplayName.value } : undefined
 }], [{
+  label: 'Личный кабинет',
+  icon: 'i-lucide-layout-panel-left',
+  to: '/schedule'
+}, {
   label: 'Моя страница',
   icon: 'i-lucide-user',
   onSelect: () => {
@@ -34,14 +38,6 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
       window.open(`/booking/${user.value.username}`, '_blank')
     }
   }
-}, {
-  label: 'Оплата',
-  icon: 'i-lucide-credit-card',
-  to: '/payment'
-}, {
-  label: 'Настройки',
-  icon: 'i-lucide-settings',
-  to: '/settings'
 }], [{
   label: 'Внешний вид',
   icon: 'i-lucide-sun-moon',

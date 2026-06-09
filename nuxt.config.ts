@@ -5,8 +5,7 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxt/ui',
     '@nuxt/content',
-    '@vueuse/nuxt',
-    'nuxt-og-image'
+    '@vueuse/nuxt'
   ],
 
   devtools: {
@@ -33,15 +32,10 @@ export default defineNuxtConfig({
     '/api/**': {
       cors: true
     },
-    '/docs': { redirect: '/docs/getting-started', prerender: false },
-    // Публичные страницы сайта
-    '/': { prerender: true },
+    // Публичные страницы сайта (без prerender — иначе устаревший HTML ломает гидрацию)
+    '/': { ssr: true },
     '/login': { prerender: false },
     '/signup': { prerender: false },
-    '/pricing': { prerender: true },
-    '/blog/**': { prerender: true },
-    '/changelog/**': { prerender: true },
-    '/docs/**': { prerender: true },
     // Публичный календарь (по username)
     '/booking/**': { ssr: false },
     // Защищенные страницы приложения (требуют авторизации)
@@ -51,19 +45,11 @@ export default defineNuxtConfig({
     '/services': { ssr: false },
     '/settings/**': { ssr: false },
     '/profile': { ssr: false },
-    '/payment': { ssr: false }
+    '/payment': { ssr: false },
+    '/payment/**': { ssr: false }
   },
 
   compatibilityDate: '2024-07-11',
-
-  nitro: {
-    prerender: {
-      routes: [
-        '/'
-      ],
-      crawlLinks: true
-    }
-  },
 
   eslint: {
     config: {

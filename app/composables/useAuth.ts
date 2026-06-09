@@ -133,12 +133,10 @@ export const useAuth = () => {
     }
   }
 
-  // Регистрация (шаг 1 — email, телефон, пароль)
+  // Регистрация (шаг 1 — email, имя, согласия; код → пароль → завершение профиля)
   const register = async (data: {
     email: string
-    phone: string
-    password: string
-    password_confirm: string
+    first_name: string
     offer_accepted: boolean
     privacy_accepted: boolean
   }) => {
@@ -183,6 +181,40 @@ export const useAuth = () => {
     }
   }
 
+  const registerCredentials = async (data: { password: string; password_confirm: string }) => {
+    try {
+      const apiUrl = config.public.apiBase || 'http://localhost:8000'
+      const response = await $fetch<{ user: User; message?: string }>(`${apiUrl}/api/auth/register/credentials/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: data
+      })
+      user.value = response.user
+      if (process.client) {
+        localStorage.setItem('auth.user', JSON.stringify(response.user))
+      }
+      toast.add({
+        title: 'Пароль сохранён',
+        description: response.message || 'Продолжите заполнение профиля',
+        color: 'green'
+      })
+      return { success: true, data: response }
+    } catch (error: any) {
+      const dataErr = error.data
+      let errorMessage = dataErr?.detail || dataErr?.message || 'Ошибка'
+      if (typeof dataErr === 'object' && !Array.isArray(dataErr) && typeof dataErr?.detail !== 'string') {
+        const messages = Object.values(dataErr).flat().filter(Boolean)
+        if (messages.length > 0) errorMessage = messages.join('. ')
+      }
+      toast.add({
+        title: 'Ошибка',
+        description: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage),
+        color: 'red'
+      })
+      return { success: false, error: errorMessage }
+    }
+  }
+
   // Подтверждение email (шаг 2 регистрации)
   const verifyEmail = async (email: string, code: string) => {
     try {
@@ -194,8 +226,8 @@ export const useAuth = () => {
 
       saveAuth(response)
       toast.add({
-        title: 'Регистрация завершена',
-        description: response.message || 'Добро пожаловать!',
+        title: 'Email подтверждён',
+        description: response.message || 'Установите пароль',
         color: 'green'
       })
       return { success: true, data: response }
@@ -352,23 +384,64 @@ export const useAuth = () => {
     }
   }
 
-  // Завершение профиля (шаг 3 регистрации — username, имя, специальность)
-  const completeProfile = async (data: {
-    username: string
-    first_name: string
-    specialty_id?: number | null
-  }) => {
+  // Частичное обновление профиля (шаблон графика и т.д.)
+  const patchProfile = async (body: Record<string, unknown>) => {
     try {
       const profile = await $fetch<{ user: User; message: string }>(
         `${config.public.apiBase}/api/auth/profile/update/`,
         {
           method: 'PATCH',
           headers: getAuthHeaders(),
-          body: {
-            username: data.username,
-            first_name: data.first_name,
-            specialty_id: data.specialty_id ?? null
-          }
+          body
+        }
+      )
+      user.value = profile.user
+      if (process.client) {
+        localStorage.setItem('auth.user', JSON.stringify(profile.user))
+      }
+      return { success: true, user: profile.user }
+    } catch (error: any) {
+      const dataErr = error.data
+      let errorMessage = dataErr?.detail || dataErr?.message || 'Ошибка при сохранении'
+      if (typeof dataErr === 'object' && !Array.isArray(dataErr) && typeof dataErr?.detail !== 'string') {
+        const messages = Object.values(dataErr).flat().filter(Boolean)
+        if (messages.length > 0) errorMessage = messages.join('. ')
+      }
+      toast.add({ title: 'Ошибка', description: errorMessage, color: 'red' })
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  // Завершение профиля (после пароля — телефон, username, специальность; имя задано на шаге 1)
+  const completeProfile = async (data: {
+    phone: string
+    username: string
+    specialty_id?: number | null
+    work_schedule_template?: string
+    shift_cycle?: string
+    shift_anchor_date?: string | null
+  }) => {
+    try {
+      const body: Record<string, unknown> = {
+        phone: data.phone,
+        username: data.username,
+        specialty_id: data.specialty_id ?? null
+      }
+      if (data.work_schedule_template !== undefined) {
+        body.work_schedule_template = data.work_schedule_template
+      }
+      if (data.shift_cycle !== undefined) {
+        body.shift_cycle = data.shift_cycle
+      }
+      if (data.shift_anchor_date !== undefined) {
+        body.shift_anchor_date = data.shift_anchor_date
+      }
+      const profile = await $fetch<{ user: User; message: string }>(
+        `${config.public.apiBase}/api/auth/profile/update/`,
+        {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body
         }
       )
       user.value = profile.user
@@ -430,11 +503,6 @@ export const useAuth = () => {
       const apiUrl = config.public.apiBase || 'http://localhost:8000'
       const token = accessToken.value
       
-      if (process.client) {
-        console.log('Uploading avatar to:', `${apiUrl}/api/auth/avatar/`)
-        console.log('Token exists:', !!token)
-      }
-      
       const response = await fetch(`${apiUrl}/api/auth/avatar/`, {
         method: 'POST',
         headers: {
@@ -487,17 +555,48 @@ export const useAuth = () => {
     }
   }
 
+  const deleteAccount = async (username: string) => {
+    try {
+      await $fetch(`${config.public.apiBase}/api/auth/account/delete/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: { username }
+      })
+      clearAuth()
+      await router.push('/')
+      return { success: true as const }
+    } catch (error: unknown) {
+      const err = error as {
+        data?: Record<string, unknown>
+        statusMessage?: string
+      }
+      const data = err.data
+      const apiError = typeof data?.error === 'string' ? data.error : undefined
+      const detail = typeof data?.detail === 'string' ? data.detail : undefined
+      const usernameErrors = data?.username
+      const errorMessage = apiError
+        ?? detail
+        ?? (Array.isArray(usernameErrors) ? String(usernameErrors[0]) : undefined)
+        ?? err.statusMessage
+        ?? 'Не удалось удалить аккаунт'
+      return { success: false as const, error: errorMessage }
+    }
+  }
+
   return {
     user: readonly(user),
     accessToken: readonly(accessToken),
     refreshToken: readonly(refreshToken),
     isAuthenticated,
     register,
+    registerCredentials,
     verifyEmail,
     resendVerificationCode,
     completeProfile,
+    patchProfile,
     login,
     logout,
+    deleteAccount,
     refreshAccessToken,
     getAuthHeaders,
     fetchProfile,

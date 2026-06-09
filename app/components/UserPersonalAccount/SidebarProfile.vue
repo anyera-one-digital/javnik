@@ -10,12 +10,13 @@ function toggleTheme() {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
 }
 
-// План подписки (пока заглушка, в будущем из API)
-const subscriptionLabel = ref('Free')
-
 onMounted(async () => {
-  if (!user.value) await fetchProfile()
+  if (!user.value?.subscription) await fetchProfile()
 })
+
+const subscriptionLabel = computed(
+  () => user.value?.subscription?.planLabel ?? 'Free'
+)
 
 const displayName = computed(() => {
   if (!user.value) return 'Пользователь'
@@ -29,9 +30,9 @@ const avatarUrl = computed(() => user.value?.avatar_url || undefined)
 </script>
 
 <template>
-  <div v-if="!collapsed" class="pt-4 pb-2 pl-4 text-left">
-    <div class="flex items-center justify-between gap-2 mb-[48px] pr-1">
-      <NuxtLink :to="'/dashboard'" class="text-sm font-bold text-highlighted tracking-tight shrink-0">
+  <div v-if="!collapsed" class="pt-4 pb-2 pl-4 text-left max-md:pt-2">
+    <div class="hidden md:flex items-center justify-between gap-2 mb-[48px] pr-1">
+      <NuxtLink :to="'/schedule'" class="text-sm font-bold text-highlighted tracking-tight shrink-0">
         Явьник
       </NuxtLink>
       <UButton

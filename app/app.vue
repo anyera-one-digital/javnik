@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ru } from '@nuxt/ui/locale'
+
 const colorMode = useColorMode()
 
 const color = computed(() => colorMode.value === 'dark' ? '#1b1718' : 'white')
@@ -23,32 +25,14 @@ useSeoMeta({
   twitterImage: 'https://ui.nuxt.com/assets/templates/nuxt/saas-light.png',
   twitterCard: 'summary_large_image'
 })
-
-// Навигация для контента временно отключена
-const navigation = ref([])
-const files = ref([])
-const links = []
-
-provide('navigation', navigation)
 </script>
 
 <template>
-  <UApp>
+  <UApp :locale="ru">
     <NuxtLoadingIndicator />
 
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
-
-    <ClientOnly>
-      <LazyUContentSearch
-        v-if="files && files.length > 0"
-        :files="files"
-        shortcut="meta_k"
-        :navigation="navigation"
-        :links="links"
-        :fuse="{ resultLimit: 42 }"
-      />
-    </ClientOnly>
   </UApp>
 </template>
