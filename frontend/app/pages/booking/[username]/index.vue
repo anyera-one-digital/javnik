@@ -75,21 +75,8 @@ const loadUserProfile = async () => {
     const response = await $fetch<User>(apiUrl)
     publicUser.value = response
     
-    // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
-      const config = useRuntimeConfig()
-      const baseUrl = config.public.apiBase || 'http://localhost:8000'
-      
-      if (response.avatar_url.includes('://backend:') || response.avatar_url.includes('://backend/')) {
-        const urlPath = response.avatar_url.replace(/^https?:\/\/[^\/]+/, '')
-        publicUser.value.avatar_url = `${baseUrl}${urlPath}`
-      } else if (!response.avatar_url.startsWith('http')) {
-        if (response.avatar_url.startsWith('/')) {
-          publicUser.value.avatar_url = `${baseUrl}${response.avatar_url}`
-        } else {
-          publicUser.value.avatar_url = `${baseUrl}/${response.avatar_url}`
-        }
-      }
+      publicUser.value.avatar_url = normalizeMediaUrl(response.avatar_url) ?? response.avatar_url
     }
   } catch (error: any) {
     console.error('Error loading user profile:', error)
@@ -491,11 +478,7 @@ async function submitBooking() {
 
   isBookingSubmitting.value = true
   try {
-    const config = useRuntimeConfig()
-    const apiBase = config.public.apiBase || 'http://localhost:8000'
-    const bookingUrl = `${apiBase}/api/public/bookings/${username.value}/create/`
-
-    await $fetch(bookingUrl, {
+    await $fetch(`/api/public/bookings/${username.value}/create/`, {
       method: 'POST',
       body: {
         serviceId: selectedService.value.id,
@@ -592,7 +575,7 @@ const allPortfolioImages = computed(() => {
           images.push({
             id: img.id || images.length,
             service_id: service.id,
-            image_url: img.image_url,
+            image_url: normalizeMediaUrl(img.image_url) ?? img.image_url,
             service_name: service.name,
             order: img.order ?? 0
           })

@@ -66,7 +66,7 @@ async function loadDeletionStatus() {
       await fetchProfile()
     }
     deletionStatus.value = await $fetch<DeletionStatus>(
-      `${config.public.apiBase}/api/auth/account/deletion-status/`,
+      '/api/auth/account/deletion-status/',
       { headers: getAuthHeaders() }
     )
   } catch (e) {

@@ -90,7 +90,7 @@ const detailBlockHelp
 
 // Подсказка через UPopover (mode click) — открытие по тапу/клику, не по ховеру
 const scheduleHelpPopoverUi = {
-  content: 'z-[200] w-[min(20rem,calc(100vw-2rem))] max-w-[min(20rem,calc(100vw-2rem))] p-3 text-left text-balance'
+  content: 'z-[300] w-[min(20rem,calc(100vw-2rem))] max-w-[min(20rem,calc(100vw-2rem))] p-3 text-left text-balance'
 }
 
 const compactSelectUi = {
@@ -796,7 +796,7 @@ onMounted(async () => {
             >
               <UButton
                 type="button"
-                icon="i-lucide-circle-question-mark"
+                icon="i-lucide-circle-help"
                 color="neutral"
                 variant="ghost"
                 square
@@ -819,6 +819,7 @@ onMounted(async () => {
               :ui="compactSelectUi"
               class="w-full min-w-0 max-w-full"
               :disabled="isSavingTemplate"
+              portal
               @update:model-value="onUserChangedWorkTemplate"
             />
           </div>
@@ -841,6 +842,7 @@ onMounted(async () => {
                   { label: '4 рабочих / 4 выходных', value: '4-4' }
                 ]"
                 :disabled="isSavingTemplate"
+                portal
                 @update:model-value="onUserChangedWorkTemplate"
               />
             </div>
@@ -874,7 +876,7 @@ onMounted(async () => {
           >
             <UButton
               type="button"
-              icon="i-lucide-circle-question-mark"
+              icon="i-lucide-circle-help"
               color="neutral"
               variant="ghost"
               square
@@ -1027,6 +1029,7 @@ onMounted(async () => {
                   v-model="scheduleType"
                   :ui="compactSelectUi"
                   class="w-full min-w-0 max-w-full"
+                  portal
                   :items="[
                     { label: 'Рабочий день', value: 'workday', icon: 'i-lucide-briefcase' },
                     { label: 'Нерабочий день', value: 'nonworkday', icon: 'i-lucide-trash-2' },

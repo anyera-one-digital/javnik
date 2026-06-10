@@ -588,8 +588,8 @@ const slotTimeForModal = ref<string | null>(null)
 const workScheduleOpen = ref(false)
 
 const workScheduleSlideoverUi = {
-  content: 'w-full min-w-0 sm:max-w-2xl md:max-w-3xl',
-  body: 'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6',
+  content: 'w-full min-w-0 sm:max-w-2xl md:max-w-3xl overflow-visible',
+  body: 'flex-1 min-h-0 overflow-y-auto overflow-x-visible p-4 sm:p-6',
   header: 'shrink-0 border-b border-default',
   title: 'text-base sm:text-lg pr-10',
   close: 'absolute top-4 end-4 z-10'

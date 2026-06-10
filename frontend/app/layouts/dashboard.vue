@@ -21,6 +21,7 @@ const { selectedDate: selectedScheduleDate, pushScheduleDate } = useSchedulePage
 const { getAuthHeaders } = useAuth()
 const { data: scheduleBookings } = await useFetch<Booking[]>('/api/bookings/', {
   default: () => [],
+  lazy: true,
   headers: () => getAuthHeaders()
 })
 
