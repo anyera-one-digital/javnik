@@ -47,24 +47,8 @@ const loadUserProfile = async () => {
 
     publicUser.value = response
 
-    // Исправляем URL аватара, если он содержит внутренние Docker имена
     if (response.avatar_url) {
-      const config = useRuntimeConfig()
-      const baseUrl = config.public.apiBase || 'http://localhost:8000'
-      
-      // Если URL содержит внутренний хост backend, заменяем на localhost
-      if (response.avatar_url.includes('://backend:') || response.avatar_url.includes('://backend/')) {
-        // Извлекаем путь из URL
-        const urlPath = response.avatar_url.replace(/^https?:\/\/[^\/]+/, '')
-        publicUser.value.avatar_url = `${baseUrl}${urlPath}`
-      } else if (!response.avatar_url.startsWith('http')) {
-        // Если URL не полный, формируем его
-        if (response.avatar_url.startsWith('/')) {
-          publicUser.value.avatar_url = `${baseUrl}${response.avatar_url}`
-        } else {
-          publicUser.value.avatar_url = `${baseUrl}/${response.avatar_url}`
-        }
-      }
+      publicUser.value.avatar_url = normalizeMediaUrl(response.avatar_url) ?? response.avatar_url
     }
   } catch (error: any) {
     console.error('Error loading user profile:', error)

@@ -30,30 +30,44 @@ services:
       dockerfile: Dockerfile
     container_name: javnik_backend
     volumes:
+      - ./backend:/app
       - ./backend/content:/app/content:ro
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - javnik_network
     restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             daphne -b 0.0.0.0 -p 8000 bookly_api.asgi:application"
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: javnik_frontend
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
     env_file:
       - .env
+    environment:
+      NODE_ENV: development
+      API_BASE_URL: http://backend:8000
+      NUXT_PUBLIC_API_BASE_URL: /api
     depends_on:
       - backend
     networks:
       - javnik_network
     restart: unless-stopped
+    command: pnpm dev --host 0.0.0.0 --port 3000
 
   nginx:
     image: nginx:alpine
@@ -77,14 +91,17 @@ services:
       dockerfile: Dockerfile
     container_name: javnik_celery_worker
     volumes:
+      - ./backend:/app
       - ./backend/content:/app/content:ro
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - javnik_network
     restart: unless-stopped
@@ -96,18 +113,20 @@ services:
       dockerfile: Dockerfile
     container_name: javnik_celery_beat
     volumes:
+      - ./backend:/app
       - ./backend/content:/app/content:ro
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - javnik_network
     restart: unless-stopped
     command: celery -A bookly_api beat --loglevel=info
 
-  # Flower (мониторинг Celery)
   flower:
     build:
       context: ./backend
@@ -134,3 +153,4 @@ volumes:
   redis_data:
   static_volume:
   media_volume:
+  frontend_node_modules:

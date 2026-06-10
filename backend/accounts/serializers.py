@@ -182,25 +182,8 @@ class UserSerializer(serializers.ModelSerializer):
         return value.lower()  # Приводим к нижнему регистру
     
     def get_avatar_url(self, obj):
-        """
-        Возвращает полный URL аватара
-        """
+        """Относительный URL аватара — браузер подставит текущий origin (https://javnik.ru)."""
         if obj.avatar:
-            request = self.context.get('request')
-            if request:
-                # Используем build_absolute_uri, но заменяем внутренний хост на доступный из браузера
-                url = request.build_absolute_uri(obj.avatar.url)
-                # Заменяем внутренние Docker имена хостов на localhost для разработки
-                from django.conf import settings
-                # Если URL содержит внутренний хост backend, заменяем на localhost
-                if '://backend:' in url:
-                    # Заменяем backend:8000 на localhost:8000
-                    url = url.replace('://backend:8000', '://localhost:8000')
-                elif '://backend/' in url:
-                    # Заменяем backend/ на localhost:8000/
-                    url = url.replace('://backend/', '://localhost:8000/')
-                return url
-            # Если нет request, возвращаем относительный путь
             return obj.avatar.url
         return None
     

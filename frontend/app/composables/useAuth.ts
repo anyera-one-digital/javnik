@@ -1,4 +1,5 @@
 import type { User } from '~/types'
+import { getClientApiBase } from '~/utils/apiBase'
 
 interface AuthTokens {
   access: string
@@ -16,20 +17,11 @@ export const useAuth = () => {
   const router = useRouter()
   const toast = useToast()
 
-  // Определяем базовый URL для API
-  // В production используем относительные пути (пустая строка)
-  // В development используем http://localhost:8000
   const getApiUrl = () => {
     if (process.server) {
-      // На сервере используем config.apiBase (внутренний URL)
       return config.apiBase || 'http://backend:8000'
     }
-    // На клиенте в production используем относительные пути
-    if (process.env.NODE_ENV === 'production') {
-      return ''
-    }
-    // В development используем localhost
-    return config.public.apiBase || 'http://localhost:8000'
+    return getClientApiBase()
   }
   const accessToken = useState<string | null>('auth.accessToken', () => null)
   const refreshToken = useState<string | null>('auth.refreshToken', () => null)
@@ -197,8 +189,7 @@ export const useAuth = () => {
 
   const registerCredentials = async (data: { password: string; password_confirm: string }) => {
     try {
-      const apiUrl = config.public.apiBase || 'http://localhost:8000'
-      const response = await $fetch<{ user: User; message?: string }>(`${apiUrl}/api/auth/register/credentials/`, {
+      const response = await $fetch<{ user: User; message?: string }>(`${getApiUrl()}/api/auth/register/credentials/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: data
@@ -402,7 +393,7 @@ export const useAuth = () => {
   const patchProfile = async (body: Record<string, unknown>) => {
     try {
       const profile = await $fetch<{ user: User; message: string }>(
-        `${config.public.apiBase}/api/auth/profile/update/`,
+        `${getApiUrl()}/api/auth/profile/update/`,
         {
           method: 'PATCH',
           headers: getAuthHeaders(),
@@ -571,7 +562,7 @@ export const useAuth = () => {
 
   const deleteAccount = async (username: string) => {
     try {
-      await $fetch(`${config.public.apiBase}/api/auth/account/delete/`, {
+      await $fetch(`${getApiUrl()}/api/auth/account/delete/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: { username }

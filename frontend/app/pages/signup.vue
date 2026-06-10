@@ -93,7 +93,7 @@ onMounted(async () => {
   specialtiesLoading.value = true
   try {
     const data = await $fetch<{ id: number; name: string; order: number; specialties: { id: number; name: string; order: number }[] }[]>(
-      `${config.public.apiBase}/api/public/specialties/`
+      '/api/public/specialties/'
     )
     const groups = data.map(cat =>
       cat.specialties.map(s => ({ label: s.name, value: s.id }))

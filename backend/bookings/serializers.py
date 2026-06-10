@@ -72,22 +72,6 @@ class ServiceImageSerializer(serializers.ModelSerializer):
                 # Если нет пути к файлу (например, файл хранится в S3), пропускаем проверку
                 pass
             
-            # Строим абсолютный URL
-            request = self.context.get('request')
-            if request:
-                try:
-                    url = request.build_absolute_uri(image_url)
-                    # Заменяем внутренние Docker имена хостов на localhost для разработки
-                    if '://backend:' in url:
-                        url = url.replace('://backend:8000', '://localhost:8000')
-                    elif '://backend/' in url:
-                        url = url.replace('://backend/', '://localhost:8000/')
-                    return url
-                except Exception as e:
-                    # Если не удалось построить абсолютный URL, возвращаем относительный
-                    print(f'Error building absolute URI for image: {e}')
-                    return image_url
-            
             return image_url
         except Exception as e:
             # Обрабатываем любые ошибки при работе с изображением
@@ -230,22 +214,6 @@ class ServiceSerializer(serializers.ModelSerializer):
             except (ValueError, AttributeError):
                 # Если нет пути к файлу (например, файл хранится в S3), пропускаем проверку
                 pass
-            
-            # Строим абсолютный URL
-            request = self.context.get('request')
-            if request:
-                try:
-                    url = request.build_absolute_uri(image_url)
-                    # Заменяем внутренние Docker имена хостов на localhost для разработки
-                    if '://backend:' in url:
-                        url = url.replace('://backend:8000', '://localhost:8000')
-                    elif '://backend/' in url:
-                        url = url.replace('://backend/', '://localhost:8000/')
-                    return url
-                except Exception as e:
-                    # Если не удалось построить абсолютный URL, возвращаем относительный
-                    print(f'Error building absolute URI for cover image: {e}')
-                    return image_url
             
             return image_url
         except Exception as e:

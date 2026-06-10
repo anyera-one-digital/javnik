@@ -23,19 +23,6 @@ const emit = defineEmits<{
 
 const toast = useToast()
 
-// Определяем базовый URL для API
-const getApiUrl = () => {
-  if (process.server) {
-    const config = useRuntimeConfig()
-    return config.apiBase || 'http://backend:8000'
-  }
-  if (process.env.NODE_ENV === 'production') {
-    return ''
-  }
-  const config = useRuntimeConfig()
-  return config.public.apiBase || 'http://localhost:8000'
-}
-
 const isOpen = computed({
   get: () => props.modelValue ?? false,
   set: (value) => emit('update:modelValue', value)
@@ -52,7 +39,6 @@ const form = reactive({
 })
 
 const isSubmitting = ref(false)
-const config = useRuntimeConfig()
 
 // Загружаем услуги - либо публичные по username, либо авторизованные
 const servicesUrl = props.username
@@ -137,11 +123,8 @@ async function onSubmit() {
   isSubmitting.value = true
 
   try {
-    // Определяем URL для создания бронирования
-    // Для публичных бронирований — POST на /create/ (GET на том же path только список)
-    const apiBase = getApiUrl()
     const bookingUrl = props.username
-      ? `${apiBase}/api/public/bookings/${props.username}/create/`
+      ? `/api/public/bookings/${props.username}/create/`
       : '/api/bookings/'
 
     if (props.event) {

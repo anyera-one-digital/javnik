@@ -28,7 +28,7 @@ async function loadSubscription() {
       return
     }
     const data = await $fetch<UserSubscription>(
-      `${config.public.apiBase}/api/auth/subscription/`,
+      '/api/auth/subscription/',
       { headers: getAuthHeaders() }
     )
     subscription.value = data
