@@ -131,14 +131,14 @@ def send_new_booking_notification_to_staff(booking_id):
     from bookings.models import Booking
 
     try:
-        booking = Booking.objects.select_related('service', 'customer', 'member', 'event').get(id=booking_id)
+        booking = Booking.objects.select_related('service', 'customer', 'user', 'event').get(id=booking_id)
         user = booking.user
 
         subject = f'Новая заявка на бронь #{booking.id} от {booking.customer.name}'
 
         # Формируем контекст для письма
         service_name = booking.service.name if booking.service else (booking.event.name if booking.event else '—')
-        member_name = booking.member.name if booking.member else '—'
+        member_name = booking.user.get_full_name() or '—'
         event_name = booking.event.name if booking.event else '—'
 
         message = f'''
@@ -353,11 +353,11 @@ def send_booking_confirmed_notification(booking_id, customer_email):
     from bookings.models import Booking
 
     try:
-        booking = Booking.objects.select_related('service', 'customer', 'member').get(id=booking_id)
+        booking = Booking.objects.select_related('service', 'customer', 'user').get(id=booking_id)
         subject = f'Бронирование #{booking.id} подтверждено!'
 
         service_name = booking.service.name if booking.service else (booking.event.name if booking.event else '—')
-        member_name = booking.member.name if booking.member else '—'
+        member_name = booking.user.get_full_name() or '—'
 
         message = f'''
 Здравствуйте, {booking.customer.name}!
