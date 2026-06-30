@@ -28,7 +28,7 @@ export const useAddressSuggest = () => {
     try {
       const data = await $fetch<{ results: AddressSuggestion[] }>('/api/address-suggest', {
         params: { q: query.trim() },
-        headers: getAuthHeaders()
+        headers: getAuthHeaders() as HeadersInit
       })
       suggestions.value = data.results || []
       isOpen.value = query.trim().length >= 2
@@ -41,7 +41,6 @@ export const useAddressSuggest = () => {
   }
 
   const search = (query: string) => {
-    suppressNextSearch.value = false
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       fetchSuggestions(query)
