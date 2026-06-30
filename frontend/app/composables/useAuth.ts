@@ -529,32 +529,45 @@ export const useAuth = () => {
         toast.add({
           title: 'Ошибка загрузки',
           description: errorMessage,
-          color: 'red'
+          color: 'error'
         })
         return { success: false, error: errorMessage }
       }
 
       const data = await response.json() as { user: User; message: string }
 
-      user.value = data.user
+      if (!data.user?.avatar_url) {
+        throw new Error('Сервер не вернул ссылку на загруженный аватар.')
+      }
+
+      const updatedUser = user.value
+        ? {
+            ...user.value,
+            avatar: data.user.avatar,
+            avatar_url: data.user.avatar_url,
+            updated_at: data.user.updated_at
+          }
+        : data.user
+
+      user.value = updatedUser
       if (process.client) {
-        localStorage.setItem('auth.user', JSON.stringify(data.user))
+        localStorage.setItem('auth.user', JSON.stringify(updatedUser))
       }
 
       toast.add({
         title: 'Аватар загружен',
         description: data.message || 'Аватар успешно обновлен',
-        color: 'green'
+        color: 'success'
       })
 
-      return { success: true, data }
+      return { success: true, data, user: updatedUser }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Ошибка при загрузке аватара'
       
       toast.add({
         title: 'Ошибка загрузки',
         description: errorMessage,
-        color: 'red'
+        color: 'error'
       })
       return { success: false, error: errorMessage }
     }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { User } from '~/types'
 
 definePageMeta({
   layout: 'dashboard',
@@ -12,6 +13,12 @@ const toast = useToast()
 const fileRef = ref<HTMLInputElement>()
 const addressSuggestRef = ref<HTMLElement>()
 const addressInputFocused = ref(false)
+type AddressSuggestion = {
+  address: string
+  title: string
+  uri?: string
+}
+
 const { suggestions: addressSuggestions, loading: addressSuggestLoading, isOpen: addressSuggestOpen, search: addressSuggestSearch, select: addressSuggestSelect, close: addressSuggestClose } = useAddressSuggest()
 
 const addressSearchQuery = ref('')
@@ -29,6 +36,9 @@ interface SpecialtyCategoryItem {
 
 const isLoading = ref(false)
 const isUploadingAvatar = ref(false)
+const isSyncingProfile = ref(false)
+const isProfileHydrated = ref(false)
+const profileDirty = ref(false)
 
 onMounted(async () => {
   await fetchProfile()
@@ -71,20 +81,40 @@ const profile = reactive<Partial<ProfileSchema & { avatar_url?: string }>>({
   avatar_url: user.value?.avatar_url || undefined
 })
 
+function syncProfileFromUser(newUser: User | null) {
+  if (!newUser) return
+
+  isSyncingProfile.value = true
+  profile.username = newUser.username || ''
+  profile.first_name = newUser.first_name || ''
+  profile.last_name = newUser.last_name || ''
+  profile.phone = newUser.phone || ''
+  profile.email = newUser.email || ''
+  profile.specialty_id = newUser.specialty_id ?? null
+  profile.bio = newUser.bio || ''
+  profile.city = newUser.city || ''
+  profile.service_address = newUser.service_address || ''
+  profile.avatar_url = newUser.avatar_url || undefined
+  addressSearchQuery.value = newUser.service_address || ''
+  profileDirty.value = false
+  isProfileHydrated.value = true
+  nextTick(() => {
+    isSyncingProfile.value = false
+  })
+}
+
 watch(() => user.value, (newUser) => {
-  if (newUser) {
-    profile.username = newUser.username || ''
-    profile.first_name = newUser.first_name || ''
-    profile.last_name = newUser.last_name || ''
-    profile.phone = newUser.phone || ''
-    profile.email = newUser.email || ''
-    profile.specialty_id = newUser.specialty_id ?? null
-    profile.bio = newUser.bio || ''
-    profile.city = newUser.city || ''
-    profile.service_address = newUser.service_address || ''
-    profile.avatar_url = newUser.avatar_url || undefined
+  if (!newUser) return
+  if (!isProfileHydrated.value || !profileDirty.value) {
+    syncProfileFromUser(newUser)
   }
 }, { immediate: true })
+
+watch(profile, () => {
+  if (!isSyncingProfile.value && isProfileHydrated.value) {
+    profileDirty.value = true
+  }
+}, { deep: true })
 
 watch(() => profile.service_address, (val) => {
   if (!addressInputFocused.value) {
@@ -93,17 +123,25 @@ watch(() => profile.service_address, (val) => {
 }, { immediate: true })
 
 watch(() => addressSearchQuery.value, (val) => {
-  addressSuggestSearch(val ?? '')
+  if (addressInputFocused.value && profile.service_address !== val) {
+    profile.service_address = val ?? ''
+  }
+  if (addressInputFocused.value) {
+    addressSuggestSearch(val ?? '')
+  } else {
+    addressSuggestClose()
+  }
 })
 
-function onAddressSelect(item: { address: string }) {
+function onAddressSelect(item: AddressSuggestion) {
   profile.service_address = addressSuggestSelect(item)
   addressSearchQuery.value = profile.service_address
 }
 
 function onAddressBlur() {
   addressInputFocused.value = false
-  addressSearchQuery.value = profile.service_address ?? ''
+  profile.service_address = addressSearchQuery.value.trim()
+  addressSearchQuery.value = profile.service_address
 }
 
 function clearAddress() {
@@ -120,7 +158,7 @@ async function onSubmit(event: FormSubmitEvent<ProfileSchema>) {
       headers: {
         ...getAuthHeaders(),
         'Content-Type': 'application/json'
-      },
+      } as HeadersInit,
       body: {
         username: event.data.username,
         first_name: event.data.first_name || '',
@@ -134,19 +172,20 @@ async function onSubmit(event: FormSubmitEvent<ProfileSchema>) {
     })
 
     await fetchProfile()
+    syncProfileFromUser(user.value ?? response.user)
 
     toast.add({
       title: 'Успешно',
       description: response.message || 'Ваши настройки были обновлены.',
       icon: 'i-lucide-check',
-      color: 'green'
+      color: 'success'
     })
   } catch (error: any) {
     const errorMessage = error.data?.detail || error.data?.message || 'Ошибка при обновлении профиля'
     toast.add({
       title: 'Ошибка',
       description: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage),
-      color: 'red'
+      color: 'error'
     })
   } finally {
     isLoading.value = false
@@ -161,12 +200,15 @@ async function onFileChange(e: Event) {
   }
 
   const file = input.files[0]
+  if (!file) {
+    return
+  }
 
   if (file.size > 1024 * 1024) {
     toast.add({
       title: 'Ошибка',
       description: 'Размер файла превышает 1 МБ.',
-      color: 'red'
+      color: 'error'
     })
     return
   }
@@ -176,20 +218,27 @@ async function onFileChange(e: Event) {
     toast.add({
       title: 'Ошибка',
       description: 'Недопустимый тип файла. Разрешены только JPG, PNG и GIF.',
-      color: 'red'
+      color: 'error'
     })
     return
   }
 
   isUploadingAvatar.value = true
-  profile.avatar_url = URL.createObjectURL(file)
+  const previewUrl = URL.createObjectURL(file)
+  const previousAvatarUrl = profile.avatar_url
+  profile.avatar_url = previewUrl
 
   try {
     const result = await uploadAvatar(file)
     if (!result.success) {
-      profile.avatar_url = user.value?.avatar_url
+      profile.avatar_url = previousAvatarUrl
+      return
     }
+    profile.avatar_url = result.user?.avatar_url || previousAvatarUrl
+  } catch {
+    profile.avatar_url = previousAvatarUrl
   } finally {
+    URL.revokeObjectURL(previewUrl)
     isUploadingAvatar.value = false
     if (input) {
       input.value = ''
@@ -206,7 +255,7 @@ function openPublicProfilePreview() {
     toast.add({
       title: 'Ошибка',
       description: 'Не удалось получить имя пользователя',
-      color: 'red'
+      color: 'error'
     })
     return
   }
@@ -457,7 +506,6 @@ function openPublicProfilePreview() {
                   :src="profile.avatar_url"
                   :alt="profile.first_name || profile.username"
                   size="lg"
-                  :loading="isUploadingAvatar"
                 />
                 <UButton
                   label="Выбрать"
