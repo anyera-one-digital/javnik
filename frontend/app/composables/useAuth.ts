@@ -1,5 +1,5 @@
 import type { User } from '~/types'
-import { getClientApiBase } from '~/utils/apiBase'
+import { getClientApiBase, normalizeMediaUrl } from '~/utils/apiBase'
 
 interface AuthTokens {
   access: string
@@ -10,6 +10,41 @@ interface AuthResponse {
   user: User
   tokens: AuthTokens
   message?: string
+}
+
+function normalizeAuthUser(user: User): User {
+  return {
+    ...user,
+    avatar_url: normalizeMediaUrl(user.avatar_url) ?? user.avatar_url
+  }
+}
+
+function withCacheBuster(url: string, version: string | number = Date.now()): string {
+  if (!import.meta.client || typeof window === 'undefined') {
+    return url
+  }
+
+  try {
+    const parsedUrl = new URL(url, window.location.origin)
+    parsedUrl.searchParams.set('v', String(version))
+    return parsedUrl.toString()
+  } catch {
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}v=${encodeURIComponent(String(version))}`
+  }
+}
+
+function waitForImageLoad(url: string): Promise<void> {
+  if (!import.meta.client) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('Файл аватара загружен, но не открывается по ссылке.'))
+    image.src = url
+  })
 }
 
 export const useAuth = () => {
@@ -44,7 +79,7 @@ export const useAuth = () => {
         }
         if (storedUser) {
           try {
-            user.value = JSON.parse(storedUser)
+            user.value = normalizeAuthUser(JSON.parse(storedUser))
           } catch {
             // Игнорируем ошибки парсинга
           }
@@ -69,7 +104,7 @@ export const useAuth = () => {
       }
       if (e.key === 'auth.user') {
         try {
-          user.value = e.newValue ? JSON.parse(e.newValue) : null
+          user.value = e.newValue ? normalizeAuthUser(JSON.parse(e.newValue)) : null
         } catch {
           user.value = null
         }
@@ -109,14 +144,15 @@ export const useAuth = () => {
 
   // Сохранение в localStorage
   const saveAuth = (authData: AuthResponse) => {
-    user.value = authData.user
+    const normalizedUser = normalizeAuthUser(authData.user)
+    user.value = normalizedUser
     accessToken.value = authData.tokens.access
     refreshToken.value = authData.tokens.refresh
 
     if (process.client) {
       localStorage.setItem('auth.accessToken', authData.tokens.access)
       localStorage.setItem('auth.refreshToken', authData.tokens.refresh)
-      localStorage.setItem('auth.user', JSON.stringify(authData.user))
+      localStorage.setItem('auth.user', JSON.stringify(normalizedUser))
       
       // Триггерим событие storage для синхронизации между вкладками
       window.dispatchEvent(new StorageEvent('storage', {
@@ -194,9 +230,10 @@ export const useAuth = () => {
         headers: getAuthHeaders(),
         body: data
       })
-      user.value = response.user
+      const normalizedUser = normalizeAuthUser(response.user)
+      user.value = normalizedUser
       if (process.client) {
-        localStorage.setItem('auth.user', JSON.stringify(response.user))
+        localStorage.setItem('auth.user', JSON.stringify(normalizedUser))
       }
       toast.add({
         title: 'Пароль сохранён',
@@ -400,11 +437,12 @@ export const useAuth = () => {
           body
         }
       )
-      user.value = profile.user
+      const normalizedUser = normalizeAuthUser(profile.user)
+      user.value = normalizedUser
       if (process.client) {
-        localStorage.setItem('auth.user', JSON.stringify(profile.user))
+        localStorage.setItem('auth.user', JSON.stringify(normalizedUser))
       }
-      return { success: true, user: profile.user }
+      return { success: true, user: normalizedUser }
     } catch (error: any) {
       const dataErr = error.data
       let errorMessage = dataErr?.detail || dataErr?.message || 'Ошибка при сохранении'
@@ -449,11 +487,12 @@ export const useAuth = () => {
           body
         }
       )
-      user.value = profile.user
+      const normalizedUser = normalizeAuthUser(profile.user)
+      user.value = normalizedUser
       if (process.client) {
-        localStorage.setItem('auth.user', JSON.stringify(profile.user))
+        localStorage.setItem('auth.user', JSON.stringify(normalizedUser))
       }
-      return { success: true, user: profile.user }
+      return { success: true, user: normalizedUser }
     } catch (error: any) {
       const dataErr = error.data
       let errorMessage = dataErr?.detail || dataErr?.message || 'Ошибка при сохранении'
@@ -476,11 +515,12 @@ export const useAuth = () => {
       const profile = await $fetch<User>(`${getApiUrl()}/api/auth/profile/`, {
         headers: getAuthHeaders()
       })
-      user.value = profile
+      const normalizedProfile = normalizeAuthUser(profile)
+      user.value = normalizedProfile
       if (process.client) {
-        localStorage.setItem('auth.user', JSON.stringify(profile))
+        localStorage.setItem('auth.user', JSON.stringify(normalizedProfile))
       }
-      return profile
+      return normalizedProfile
     } catch (error) {
       // Если токен невалидный, пытаемся обновить
       if (await refreshAccessToken()) {
@@ -536,18 +576,22 @@ export const useAuth = () => {
 
       const data = await response.json() as { user: User; message: string }
 
-      if (!data.user?.avatar_url) {
+      const normalizedAvatarUrl = normalizeMediaUrl(data.user?.avatar_url) ?? data.user?.avatar_url
+      if (!normalizedAvatarUrl) {
         throw new Error('Сервер не вернул ссылку на загруженный аватар.')
       }
+
+      const displayAvatarUrl = withCacheBuster(normalizedAvatarUrl, data.user.updated_at || Date.now())
+      await waitForImageLoad(displayAvatarUrl)
 
       const updatedUser = user.value
         ? {
             ...user.value,
             avatar: data.user.avatar,
-            avatar_url: data.user.avatar_url,
+            avatar_url: displayAvatarUrl,
             updated_at: data.user.updated_at
           }
-        : data.user
+        : normalizeAuthUser({ ...data.user, avatar_url: displayAvatarUrl })
 
       user.value = updatedUser
       if (process.client) {
