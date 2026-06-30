@@ -338,6 +338,11 @@ const columns = computed<TableColumn<Service>[]>(() => [
             class="!bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
             @click="createServiceModalOpen = true"
           />
+          <ServicesServiceModal
+            v-model="editServiceModalOpen"
+            :service="editingService || undefined"
+            @saved="() => { refreshServices(); editingService = null; editServiceModalOpen = false }"
+          />
           <ServicesDeleteServiceModal
             :service="deletingService"
             @confirmed="confirmDeleteService"
@@ -363,13 +368,6 @@ const columns = computed<TableColumn<Service>[]>(() => [
       />
     </template>
   </UDashboardPanel>
-
-  <!-- Модал редактирования вынесен из navbar: мобильный header может пересоздаваться при возврате в браузер. -->
-  <ServicesServiceModal
-    v-model="editServiceModalOpen"
-    :service="editingService || undefined"
-    @saved="() => { refreshServices(); editingService = null; editServiceModalOpen = false }"
-  />
 
   <!-- Модал создания новой услуги -->
   <ServicesServiceModal
