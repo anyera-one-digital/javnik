@@ -12,6 +12,13 @@ interface AuthResponse {
   message?: string
 }
 
+interface TokenRefreshResponse {
+  access: string
+  refresh?: string
+}
+
+let refreshAccessTokenPromise: Promise<boolean> | null = null
+
 function normalizeAuthUser(user: User): User {
   return {
     ...user,
@@ -379,24 +386,46 @@ export const useAuth = () => {
       return false
     }
 
-    try {
-      const response = await $fetch<{ access: string }>(`${getApiUrl()}/api/auth/token/refresh/`, {
-        method: 'POST',
-        body: {
-          refresh: refreshToken.value
-        }
-      })
-
-      accessToken.value = response.access
-      if (process.client) {
-        localStorage.setItem('auth.accessToken', response.access)
-      }
-      return true
-    } catch (error) {
-      clearAuth()
-      router.push('/login')
-      return false
+    if (refreshAccessTokenPromise) {
+      return refreshAccessTokenPromise
     }
+
+    refreshAccessTokenPromise = (async () => {
+      try {
+        const currentRefreshToken = refreshToken.value
+        if (!currentRefreshToken) {
+          return false
+        }
+
+        const response = await $fetch<TokenRefreshResponse>(`${getApiUrl()}/api/auth/token/refresh/`, {
+          method: 'POST',
+          body: {
+            refresh: currentRefreshToken
+          }
+        })
+
+        accessToken.value = response.access
+        if (response.refresh) {
+          refreshToken.value = response.refresh
+        }
+
+        if (process.client) {
+          localStorage.setItem('auth.accessToken', response.access)
+          if (response.refresh) {
+            localStorage.setItem('auth.refreshToken', response.refresh)
+          }
+        }
+        return true
+      } catch (error) {
+        clearAuth()
+        router.push('/login')
+        return false
+      } finally {
+        refreshAccessTokenPromise = null
+      }
+    })()
+
+    return refreshAccessTokenPromise
   }
 
   // Получение заголовков для API запросов
