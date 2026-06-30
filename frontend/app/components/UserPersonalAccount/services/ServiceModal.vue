@@ -23,10 +23,6 @@ const schema = z.object({
 
 type Schema = z.output<typeof schema>
 
-type ServiceEditDraft = Partial<Schema> & {
-  removedPortfolioImageIds?: number[]
-}
-
 const open = computed({
   get: () => {
     // Если modelValue передан, используем его, иначе используем внутреннее состояние
@@ -108,65 +104,6 @@ const removedPortfolioImageIds = ref<number[]>([]) // ID удаленных из
 // Refs для input элементов
 const portfolioImagesInput = ref<HTMLInputElement | null>(null)
 
-function serviceDraftKey(serviceId: number | string): string {
-  return `javnik:service-edit-draft:${serviceId}`
-}
-
-function readServiceDraft(serviceId: number | string): ServiceEditDraft | null {
-  if (!import.meta.client) return null
-  try {
-    const raw = sessionStorage.getItem(serviceDraftKey(serviceId))
-    return raw ? JSON.parse(raw) as ServiceEditDraft : null
-  } catch {
-    return null
-  }
-}
-
-function writeServiceDraft() {
-  if (!import.meta.client || !props.service?.id || !open.value) return
-  const draft: ServiceEditDraft = {
-    name: state.name,
-    description: state.description,
-    duration: state.duration,
-    price: state.price,
-    removedPortfolioImageIds: removedPortfolioImageIds.value
-  }
-  sessionStorage.setItem(serviceDraftKey(props.service.id), JSON.stringify(draft))
-}
-
-function clearServiceDraft(serviceId = props.service?.id) {
-  if (!import.meta.client || !serviceId) return
-  sessionStorage.removeItem(serviceDraftKey(serviceId))
-}
-
-function applyServiceDraft(service: Service) {
-  const draft = readServiceDraft(service.id)
-  if (!draft) return
-
-  if (draft.name !== undefined) state.name = draft.name
-  if (draft.description !== undefined) state.description = draft.description
-  if (draft.duration !== undefined) state.duration = draft.duration
-  if (draft.price !== undefined) state.price = draft.price
-
-  removedPortfolioImageIds.value = draft.removedPortfolioImageIds || []
-  if (removedPortfolioImageIds.value.length > 0) {
-    const removed = new Set(removedPortfolioImageIds.value)
-    existingPortfolioImages.value = existingPortfolioImages.value.filter(img => !removed.has(img.id))
-    portfolioImagePreviews.value = existingPortfolioImages.value
-      .map(img => img.image_url || '')
-      .filter(Boolean)
-  }
-}
-
-function resetPortfolioFiles() {
-  portfolioImagePreviews.value.forEach((preview) => {
-    if (preview?.startsWith('blob:')) {
-      URL.revokeObjectURL(preview)
-    }
-  })
-  portfolioImageFiles.value = []
-}
-
 // Загрузка существующих изображений при редактировании
 watch(() => props.service, (service) => {
   if (service) {
@@ -185,34 +122,23 @@ watch(() => props.service, (service) => {
       portfolioImagePreviews.value = []
     }
     // Сбрасываем выбранные файлы при редактировании (чтобы не перезаписывать существующие, если не выбраны новые)
-    resetPortfolioFiles()
+    portfolioImageFiles.value = []
     removedPortfolioImageIds.value = []
-    applyServiceDraft(service)
   } else {
     // Сброс формы для новой услуги
     state.name = undefined
     state.description = undefined
     state.duration = undefined
     state.price = undefined
-    resetPortfolioFiles()
+    portfolioImageFiles.value.forEach((_, index) => {
+      if (portfolioImagePreviews.value[index] && portfolioImagePreviews.value[index].startsWith('blob:')) {
+        URL.revokeObjectURL(portfolioImagePreviews.value[index])
+      }
+    })
+    portfolioImageFiles.value = []
     portfolioImagePreviews.value = []
   }
 }, { immediate: true })
-
-watch(
-  [state, removedPortfolioImageIds, open],
-  () => writeServiceDraft(),
-  { deep: true }
-)
-
-onMounted(() => {
-  window.addEventListener('pagehide', writeServiceDraft)
-})
-
-onBeforeUnmount(() => {
-  writeServiceDraft()
-  window.removeEventListener('pagehide', writeServiceDraft)
-})
 
 // Обработчики загрузки файлов
 function onPortfolioImagesChange(e: Event) {
@@ -261,7 +187,6 @@ const { accessToken } = useAuth()
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    const savedServiceId = props.service?.id
     // Проверяем наличие токена
     let token = accessToken.value
     
@@ -359,7 +284,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     }
 
     open.value = false
-    clearServiceDraft(savedServiceId)
     // Сброс формы
     state.name = undefined
     state.description = undefined
@@ -421,11 +345,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       timeout: 10000 // Увеличиваем время показа для длинных сообщений
     })
   }
-}
-
-function cancelServiceEdit() {
-  clearServiceDraft()
-  open.value = false
 }
 </script>
 
@@ -521,7 +440,7 @@ function cancelServiceEdit() {
             label="Отмена"
             color="neutral"
             variant="subtle"
-            @click="cancelServiceEdit"
+            @click="open = false"
           />
           <UButton
             :label="service ? 'Сохранить' : 'Создать'"
