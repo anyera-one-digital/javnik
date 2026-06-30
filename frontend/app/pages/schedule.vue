@@ -599,8 +599,13 @@ function openWorkSchedulePanel() {
   workScheduleOpen.value = true
 }
 
-function onWorkScheduleSaved() {
-  void loadAllCalendarData()
+async function onWorkScheduleSaved() {
+  await loadWorkSchedules()
+  await loadBookings()
+  if (calendarViewMode.value === 'week') {
+    await loadAllBookings()
+  }
+  await loadAllEvents()
 }
 
 function stripWorkScheduleQuery() {
