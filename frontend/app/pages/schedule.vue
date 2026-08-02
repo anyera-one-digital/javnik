@@ -162,33 +162,93 @@ const isScheduleTodayInView = computed(() => {
 /** Тик каждую минуту — позиция линии «Сейчас» */
 const now = useNow({ interval: 60000 })
 
+/** Только час «сейчас» — не пересобираем сетку каждую минуту */
+const nowHour = computed(() => now.value.getHours())
+
+/** Стабильная ссылка на массив часов, чтобы hover ячеек не сбрасывался */
+const dayHoursCache = shallowRef<number[]>([])
+
 const dayHours = computed(() => {
   void scheduleTick.value
-  void now.value
   let { minHour, maxHour } = workTimeRange.value
 
   // Если сегодня в видимом диапазоне — расширяем сетку, чтобы линия «Сейчас» не пропадала вечером/утром
   if (import.meta.client && isScheduleTodayInView.value) {
-    const nh = now.value.getHours()
+    const nh = nowHour.value
     minHour = Math.min(minHour, nh)
     maxHour = Math.max(maxHour, nh)
+  }
+
+  const prev = dayHoursCache.value
+  if (
+    prev.length === maxHour - minHour + 1
+    && prev[0] === minHour
+    && prev[prev.length - 1] === maxHour
+  ) {
+    return prev
   }
 
   const hours: number[] = []
   for (let i = minHour; i <= maxHour; i++) {
     hours.push(i)
   }
+  dayHoursCache.value = hours
   return hours
 })
 
+const daySlotsCache = shallowRef<{ hour: number, minute: number }[]>([])
+
 const daySlots = computed(() => {
+  const hours = dayHours.value
+  const prev = daySlotsCache.value
+  if (prev.length === hours.length * 2) {
+    let same = true
+    for (let i = 0; i < hours.length; i++) {
+      if (prev[i * 2]?.hour !== hours[i] || prev[i * 2 + 1]?.hour !== hours[i]) {
+        same = false
+        break
+      }
+    }
+    if (same) return prev
+  }
+
   const slots: { hour: number, minute: number }[] = []
-  for (const hour of dayHours.value) {
+  for (const hour of hours) {
     slots.push({ hour, minute: 0 })
     slots.push({ hour, minute: 30 })
   }
+  daySlotsCache.value = slots
   return slots
 })
+
+/** Подсветка ячейки через состояние — надёжнее CSS :hover при ререндерах */
+const hoveredSlotKey = ref<string | null>(null)
+
+function slotKey(date: Date, hour: number, minute: number) {
+  return `${format(date, 'yyyy-MM-dd')}-${hour}-${minute}`
+}
+
+function normalizeWorkSchedule(raw: Record<string, unknown>): WorkSchedule {
+  const startRaw = raw.startTime ?? raw.start_time
+  const endRaw = raw.endTime ?? raw.end_time
+  const breaksRaw = raw.breaks
+  const breaks = Array.isArray(breaksRaw)
+    ? breaksRaw.map((b: Record<string, unknown>) => ({
+        startTime: String(b.startTime ?? b.start_time ?? '').slice(0, 5),
+        endTime: String(b.endTime ?? b.end_time ?? '').slice(0, 5)
+      })).filter(b => b.startTime && b.endTime)
+    : undefined
+
+  return {
+    id: raw.id as number | undefined,
+    user: raw.user as number | undefined,
+    date: String(raw.date ?? ''),
+    type: (raw.type as WorkSchedule['type']) || 'workday',
+    startTime: startRaw != null ? String(startRaw).slice(0, 5) : undefined,
+    endTime: endRaw != null ? String(endRaw).slice(0, 5) : undefined,
+    breaks
+  }
+}
 
 function getWorkScheduleForDate(date: Date): WorkSchedule | undefined {
   const dateStr = format(date, 'yyyy-MM-dd')
@@ -204,9 +264,11 @@ function getUnavailableTimeBlocks(date: Date): Array<{ start: number, end: numbe
   void scheduleTick.value
   const schedule = getWorkScheduleForDate(date)
   const blocks: Array<{ start: number, end: number }> = []
-  const { minHour, maxHour } = workTimeRange.value
-  const displayStartMinutes = minHour * 60
-  const displayEndMinutes = (maxHour + 1) * 60
+  const hours = dayHours.value
+  if (!hours.length) return blocks
+
+  const displayStartMinutes = hours[0]! * 60
+  const displayEndMinutes = (hours[hours.length - 1]! + 1) * 60
 
   if (!schedule) {
     return blocks
@@ -217,7 +279,7 @@ function getUnavailableTimeBlocks(date: Date): Array<{ start: number, end: numbe
   }
 
   if (!schedule.startTime || !schedule.endTime) {
-    return [{ start: displayStartMinutes, end: displayEndMinutes }]
+    return blocks
   }
 
   const [startHour, startMinute] = schedule.startTime.split(':').map(Number)
@@ -265,9 +327,14 @@ function getUnavailableTimePosition(
 ): { top: string, height: string } {
   const startMinutes = startHour * 60 + startMinute
   const endMinutes = endHour * 60 + endMinute
-  const { minHour, maxHour } = workTimeRange.value
-  const dayStartMinutes = minHour * 60
-  const dayEndMinutes = (maxHour + 1) * 60
+  const hours = dayHours.value
+  if (!hours.length) {
+    return { top: '0px', height: '0px' }
+  }
+  // Привязка к фактической сетке (dayHours), а не к workTimeRange —
+  // иначе при расширении под «Сейчас» блоки смещаются относительно ячеек
+  const dayStartMinutes = hours[0]! * 60
+  const dayEndMinutes = (hours[hours.length - 1]! + 1) * 60
 
   const clampedStartMinutes = Math.max(startMinutes, dayStartMinutes)
   const clampedEndMinutes = Math.min(endMinutes, dayEndMinutes)
@@ -283,47 +350,6 @@ function getUnavailableTimePosition(
     top: `${relativeStart * SCHEDULE_MINUTE_HEIGHT_PX}px`,
     height: `${duration * SCHEDULE_MINUTE_HEIGHT_PX}px`
   }
-}
-
-function isTimeSlotAvailable(date: Date, hour: number, minute: number = 0): boolean {
-  const schedule = getWorkScheduleForDate(date)
-
-  if (!schedule) {
-    return true
-  }
-
-  if (schedule.type !== 'workday') {
-    return false
-  }
-
-  if (!schedule.startTime || !schedule.endTime) {
-    return false
-  }
-
-  const [startHour, startMinute] = schedule.startTime.split(':').map(Number)
-  const [endHour, endMinute] = schedule.endTime.split(':').map(Number)
-  const slotMinutes = hour * 60 + minute
-  const workStartMinutes = startHour * 60 + startMinute
-  const workEndMinutes = endHour * 60 + endMinute
-
-  if (slotMinutes < workStartMinutes || slotMinutes >= workEndMinutes) {
-    return false
-  }
-
-  if (schedule.breaks?.length) {
-    for (const breakItem of schedule.breaks) {
-      const [breakStartHour, breakStartMinute] = breakItem.startTime.split(':').map(Number)
-      const [breakEndHour, breakEndMinute] = breakItem.endTime.split(':').map(Number)
-      const breakStartMinutes = breakStartHour * 60 + breakStartMinute
-      const breakEndMinutes = breakEndHour * 60 + breakEndMinute
-
-      if (slotMinutes >= breakStartMinutes && slotMinutes < breakEndMinutes) {
-        return false
-      }
-    }
-  }
-
-  return true
 }
 
 async function fetchBookingsWithAuth(url: string): Promise<Booking[] | null> {
@@ -499,8 +525,9 @@ async function loadWorkSchedules() {
     }
     if (response?.length) {
       for (const schedule of response) {
-        if (schedule?.date) {
-          next.set(schedule.date, schedule)
+        const normalized = normalizeWorkSchedule(schedule as unknown as Record<string, unknown>)
+        if (normalized.date) {
+          next.set(normalized.date, normalized)
         }
       }
     }
@@ -520,8 +547,9 @@ async function loadWorkSchedules() {
         }
         if (response?.length) {
           for (const schedule of response) {
-            if (schedule?.date) {
-              next.set(schedule.date, schedule)
+            const normalized = normalizeWorkSchedule(schedule as unknown as Record<string, unknown>)
+            if (normalized.date) {
+              next.set(normalized.date, normalized)
             }
           }
         }
@@ -696,7 +724,6 @@ function openBookingEdit(booking: Booking) {
 }
 
 function openCreateChoiceForSlot(date: Date, hour: number, minute: number) {
-  if (!isTimeSlotAvailable(date, hour, minute)) return
   slotDateForModal.value = date
   slotTimeForModal.value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
   selectedBookingForEdit.value = null
@@ -1300,19 +1327,21 @@ function openPublicProfilePreview() {
                 :style="{ gridTemplateRows: `repeat(${daySlots.length}, ${SCHEDULE_HALF_HOUR_PX}px)` }"
               >
                 <div
-                  v-for="(slot, idx) in daySlots"
+                  v-for="slot in daySlots"
                   :key="`slot-${slot.hour}-${slot.minute}`"
                   class="flex items-center justify-center cursor-pointer transition-colors"
-                  :class="[
-                    isTimeSlotAvailable(selectedDate, slot.hour, slot.minute)
-                      ? 'hover:bg-primary/10 group'
-                      : 'cursor-default pointer-events-none'
-                  ]"
-                  @click="isTimeSlotAvailable(selectedDate, slot.hour, slot.minute) && openCreateChoiceForSlot(selectedDate, slot.hour, slot.minute)"
+                  :class="hoveredSlotKey === slotKey(selectedDate, slot.hour, slot.minute)
+                    ? 'bg-primary/10'
+                    : ''"
+                  @mouseenter="hoveredSlotKey = slotKey(selectedDate, slot.hour, slot.minute)"
+                  @mouseleave="hoveredSlotKey = null"
+                  @click="openCreateChoiceForSlot(selectedDate, slot.hour, slot.minute)"
                 >
                   <span
-                    v-if="isTimeSlotAvailable(selectedDate, slot.hour, slot.minute)"
-                    class="opacity-0 group-hover:opacity-100 transition-opacity text-primary text-xs font-medium"
+                    class="text-primary text-xs font-medium transition-opacity"
+                    :class="hoveredSlotKey === slotKey(selectedDate, slot.hour, slot.minute)
+                      ? 'opacity-100'
+                      : 'opacity-0'"
                   >
                     + Добавить
                   </span>
@@ -1487,7 +1516,7 @@ function openPublicProfilePreview() {
                   <div
                     v-for="hour in dayHours"
                     :key="`${dayCol.key}-h-${hour}`"
-                    class="border-b border-default relative"
+                    class="border-b border-default relative pointer-events-none"
                     :style="{ height: `${SCHEDULE_HOUR_HEIGHT_PX}px`, minHeight: `${SCHEDULE_HOUR_HEIGHT_PX}px`, maxHeight: `${SCHEDULE_HOUR_HEIGHT_PX}px`, boxSizing: 'border-box' }"
                   >
                     <div class="absolute left-0 right-0 border-t border-dashed border-default/50" :style="{ top: `${SCHEDULE_HALF_HOUR_PX}px`, height: 0, boxSizing: 'border-box' }" />
@@ -1513,23 +1542,25 @@ function openPublicProfilePreview() {
                   </div>
 
                   <div
-                    class="absolute inset-0 z-[5] grid"
+                    class="absolute inset-0 z-10 grid"
                     :style="{ gridTemplateRows: `repeat(${daySlots.length}, ${SCHEDULE_HALF_HOUR_PX}px)` }"
                   >
                     <div
                       v-for="slot in daySlots"
                       :key="`slot-${dayCol.key}-${slot.hour}-${slot.minute}`"
                       class="flex items-center justify-center cursor-pointer transition-colors"
-                      :class="[
-                        isTimeSlotAvailable(dayCol.date, slot.hour, slot.minute)
-                          ? 'hover:bg-primary/10 group'
-                          : 'cursor-default pointer-events-none'
-                      ]"
-                      @click="isTimeSlotAvailable(dayCol.date, slot.hour, slot.minute) && openCreateChoiceForSlot(dayCol.date, slot.hour, slot.minute)"
+                      :class="hoveredSlotKey === slotKey(dayCol.date, slot.hour, slot.minute)
+                        ? 'bg-primary/15'
+                        : ''"
+                      @mouseenter="hoveredSlotKey = slotKey(dayCol.date, slot.hour, slot.minute)"
+                      @mouseleave="hoveredSlotKey = null"
+                      @click="openCreateChoiceForSlot(dayCol.date, slot.hour, slot.minute)"
                     >
                       <span
-                        v-if="isTimeSlotAvailable(dayCol.date, slot.hour, slot.minute)"
-                        class="opacity-0 group-hover:opacity-100 transition-opacity text-primary text-[10px] font-medium"
+                        class="text-primary text-[10px] font-medium transition-opacity"
+                        :class="hoveredSlotKey === slotKey(dayCol.date, slot.hour, slot.minute)
+                          ? 'opacity-100'
+                          : 'opacity-0'"
                       >
                         +
                       </span>
