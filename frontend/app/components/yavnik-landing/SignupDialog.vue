@@ -16,7 +16,7 @@ withDefaults(defineProps<{
   variant?: 'primary' | 'secondary'
   large?: boolean
 }>(), {
-  label: 'Создать страницу бесплатно',
+  label: 'Получить месяц Pro бесплатно',
   variant: 'primary',
   large: false
 })
@@ -93,7 +93,7 @@ const submit = async () => {
               class="yv-btn yv-btn--primary yv-btn--lg"
               type="submit"
             >
-              Начать бесплатно
+              Начать — месяц Pro бесплатно
             </button>
           </form>
           <small>Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности.</small>

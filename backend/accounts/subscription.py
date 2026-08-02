@@ -26,7 +26,7 @@ GRANTED_CHOICES = [
     (GRANTED_PAYMENT, 'Оплата'),
 ]
 
-TRIAL_DAYS = 14
+TRIAL_DAYS = 30  # первый месяц Pro бесплатно при регистрации
 
 # Суммы в копейках (должны совпадать с app/pages/payment.vue)
 SUBSCRIPTION_PRICE_KOPECKS = {
@@ -112,7 +112,7 @@ def activate_pro_from_payment(user, billing_period: str, *, save: bool = True) -
 
 
 def start_pro_trial(user, *, save: bool = True) -> None:
-    """14 дней Pro при регистрации."""
+    """Первый месяц тарифа Pro бесплатно при регистрации."""
     now = timezone.now()
     user.subscription_plan = PLAN_PRO
     user.subscription_expires_at = now + timedelta(days=TRIAL_DAYS)

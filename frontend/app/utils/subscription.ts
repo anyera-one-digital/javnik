@@ -16,7 +16,7 @@ export function subscriptionStatusText(sub: UserSubscription | null | undefined)
 
   if (sub.effectivePlan === 'free') {
     if (sub.plan === 'pro' && sub.expiresAt) {
-      return 'Пробный период Pro завершён. Оформите подписку, чтобы вернуть лимиты Pro.'
+      return 'Бесплатный месяц Pro завершён. Аккаунт на тарифе Free — оформите подписку, чтобы вернуть Pro.'
     }
     return 'Тариф Free — без срока действия'
   }
@@ -25,8 +25,8 @@ export function subscriptionStatusText(sub: UserSubscription | null | undefined)
   if (sub.isTrial) {
     if (sub.daysRemaining === 0) {
       return dateStr
-        ? `Пробный Pro заканчивается сегодня (${dateStr})`
-        : 'Пробный Pro заканчивается сегодня'
+        ? `Бесплатный месяц Pro заканчивается сегодня (${dateStr})`
+        : 'Бесплатный месяц Pro заканчивается сегодня'
     }
     if (sub.daysRemaining != null && sub.daysRemaining > 0) {
       const daysWord = sub.daysRemaining === 1
@@ -34,7 +34,7 @@ export function subscriptionStatusText(sub: UserSubscription | null | undefined)
         : sub.daysRemaining >= 2 && sub.daysRemaining <= 4
           ? 'дня'
           : 'дней'
-      return `Пробный Pro · осталось ${sub.daysRemaining} ${daysWord}${dateStr ? ` (до ${dateStr})` : ''}`
+      return `Бесплатный месяц Pro · осталось ${sub.daysRemaining} ${daysWord}${dateStr ? ` (до ${dateStr})` : ''}`
     }
   }
 

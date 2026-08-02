@@ -153,8 +153,8 @@ onBeforeUnmount(() => clearInterval(demoTimer));
               </UiButton>
             </div>
             <ul class="hero-proof" aria-label="Преимущества">
-              <li><Check :size="14" /> Бесплатный старт</li>
-              <li><Check :size="14" /> Настройка за 5 минут</li>
+              <li><Check :size="14" /> 1 месяц Pro бесплатно</li>
+              <li><Check :size="14" /> Без банковской карты</li>
               <li><Check :size="14" /> Работает с телефона</li>
             </ul>
           </div>
@@ -270,7 +270,11 @@ onBeforeUnmount(() => clearInterval(demoTimer));
       <section id="pricing" class="pricing-section section-pad">
         <div class="container">
           <div class="pricing-head reveal">
-            <UiSectionHeading label="Стоимость" title="Начните бесплатно. Перейдите на Pro, когда потребуется больше." />
+            <UiSectionHeading
+              label="Стоимость"
+              title="Первый месяц Pro — бесплатно. Дальше Free или подписка."
+              text="При регистрации открывается полный Pro на 30 дней без карты. Потом остаётесь на Free или продлеваете Pro."
+            />
             <ToggleGroupRoot v-model="billing" class="billing-toggle" type="single" aria-label="Период оплаты">
               <ToggleGroupItem value="month">Месяц</ToggleGroupItem>
               <ToggleGroupItem value="year">Год <small>−17%</small></ToggleGroupItem>
@@ -278,30 +282,30 @@ onBeforeUnmount(() => clearInterval(demoTimer));
           </div>
           <div class="pricing-grid">
             <article class="price-card reveal">
-              <div class="price-card__head"><div><UiChip>Для старта</UiChip><h3>Free</h3></div><strong>0 ₽</strong></div>
-              <p>Чтобы спокойно попробовать сервис и принять первые записи.</p>
+              <div class="price-card__head"><div><UiChip>После пробного</UiChip><h3>Free</h3></div><strong>0 ₽</strong></div>
+              <p>Базовый тариф без срока: продолжайте принимать записи с лимитами Free.</p>
               <ul>
                 <li><Check :size="16" /> До 50 клиентов</li>
                 <li><Check :size="16" /> До 10 записей в месяц</li>
                 <li><Check :size="16" /> До 5 услуг</li>
                 <li><Check :size="16" /> Уведомления на почту</li>
               </ul>
-              <SignupDialog label="Начать бесплатно" variant="secondary" large />
+              <SignupDialog label="Начать с Pro бесплатно" variant="secondary" large />
             </article>
             <article class="price-card price-card--pro reveal">
-              <div class="price-card__badge"><Sparkles :size="14" /> Для активной практики</div>
+              <div class="price-card__badge"><Sparkles :size="14" /> 1 месяц бесплатно</div>
               <div class="price-card__head"><div><UiChip>Все возможности</UiChip><h3>Pro</h3></div><strong>{{ billing === 'month' ? '500 ₽' : '5 000 ₽' }}<small>/{{ billing === 'month' ? 'мес' : 'год' }}</small></strong></div>
-              <p>Для специалистов, которые принимают клиентов каждый день.</p>
+              <p>При регистрации — месяц Pro в подарок. Дальше 500 ₽/мес или остаётесь на Free.</p>
               <ul>
                 <li><Check :size="16" /> До 1 500 клиентов</li>
                 <li><Check :size="16" /> До 150 записей в месяц</li>
                 <li><Check :size="16" /> До 15 услуг</li>
                 <li><Check :size="16" /> Аналитика и предоплата</li>
               </ul>
-              <SignupDialog label="Попробовать Pro" large />
+              <SignupDialog label="Получить месяц Pro" large />
             </article>
           </div>
-          <p class="pricing-note">Без карты на старте · Отмена в любой момент · Данные остаются вашими</p>
+          <p class="pricing-note">1 месяц Pro бесплатно · Без карты · После — Free или платная подписка</p>
         </div>
       </section>
 
@@ -322,7 +326,7 @@ onBeforeUnmount(() => clearInterval(demoTimer));
           <h2>Освободите время<br>для своей работы.</h2>
           <p>Пусть записью занимается Явьник.</p>
           <SignupDialog large />
-          <small><Check :size="14" /> Бесплатно · без банковской карты</small>
+          <small><Check :size="14" /> 1 месяц Pro бесплатно · без банковской карты</small>
         </div>
       </section>
     </main>

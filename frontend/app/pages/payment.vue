@@ -66,7 +66,7 @@ const plans = [
   {
     id: 'free' as const,
     title: 'Free',
-    description: 'Бесплатный план для начала работы.',
+    description: 'После пробного месяца — базовый тариф без срока.',
     price: { month: '0₽', year: '0₽' },
     features: [
       'Базовые функции',
@@ -80,9 +80,10 @@ const plans = [
   {
     id: 'pro' as const,
     title: 'Pro',
-    description: 'Весь базовый функционал',
+    description: 'При регистрации — 1 месяц бесплатно, далее по подписке.',
     price: { month: '500₽', year: '4800₽' },
     features: [
+      '1 месяц Pro при регистрации',
       'Базовый функционал',
       'Аналитика',
       'До 1500 клиентов',
