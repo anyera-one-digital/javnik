@@ -369,7 +369,7 @@ export const useAuth = () => {
     }
 
     try {
-      const response = await $fetch<{ access: string }>(`${getApiUrl()}/api/auth/token/refresh/`, {
+      const response = await $fetch<{ access: string, refresh?: string }>(`${getApiUrl()}/api/auth/token/refresh/`, {
         method: 'POST',
         body: {
           refresh: refreshToken.value
@@ -379,6 +379,13 @@ export const useAuth = () => {
       accessToken.value = response.access
       if (process.client) {
         localStorage.setItem('auth.accessToken', response.access)
+      }
+      // При ROTATE_REFRESH_TOKENS бэкенд отдаёт новый refresh — его нужно сохранить
+      if (response.refresh) {
+        refreshToken.value = response.refresh
+        if (process.client) {
+          localStorage.setItem('auth.refreshToken', response.refresh)
+        }
       }
       return true
     } catch (error) {

@@ -162,22 +162,14 @@ const isScheduleTodayInView = computed(() => {
 /** Тик каждую минуту — позиция линии «Сейчас» */
 const now = useNow({ interval: 60000 })
 
-/** Только час «сейчас» — не пересобираем сетку каждую минуту */
-const nowHour = computed(() => now.value.getHours())
-
 /** Стабильная ссылка на массив часов, чтобы hover ячеек не сбрасывался */
 const dayHoursCache = shallowRef<number[]>([])
 
 const dayHours = computed(() => {
   void scheduleTick.value
-  let { minHour, maxHour } = workTimeRange.value
-
-  // Если сегодня в видимом диапазоне — расширяем сетку, чтобы линия «Сейчас» не пропадала вечером/утром
-  if (import.meta.client && isScheduleTodayInView.value) {
-    const nh = nowHour.value
-    minHour = Math.min(minHour, nh)
-    maxHour = Math.max(maxHour, nh)
-  }
+  // Диапазон только от графика/записей — не расширяем под «сейчас»,
+  // иначе ночью/утром вся сетка заливается серым как выходной.
+  const { minHour, maxHour } = workTimeRange.value
 
   const prev = dayHoursCache.value
   if (
@@ -239,13 +231,14 @@ function normalizeWorkSchedule(raw: Record<string, unknown>): WorkSchedule {
       })).filter(b => b.startTime && b.endTime)
     : undefined
 
+  const dateRaw = String(raw.date ?? '')
   return {
     id: raw.id as number | undefined,
     user: raw.user as number | undefined,
-    date: String(raw.date ?? ''),
+    date: dateRaw.slice(0, 10),
     type: (raw.type as WorkSchedule['type']) || 'workday',
-    startTime: startRaw != null ? String(startRaw).slice(0, 5) : undefined,
-    endTime: endRaw != null ? String(endRaw).slice(0, 5) : undefined,
+    startTime: startRaw != null && String(startRaw) !== '' ? String(startRaw).slice(0, 5) : undefined,
+    endTime: endRaw != null && String(endRaw) !== '' ? String(endRaw).slice(0, 5) : undefined,
     breaks
   }
 }
@@ -817,7 +810,7 @@ const currentTimeTopPx = computed(() => {
   const dayEndMinutes = (lastHour + 1) * 60
   const currentMinutes = now.value.getHours() * 60 + now.value.getMinutes()
 
-  // В пределах сетки (сетка уже расширена под «сейчас» в dayHours)
+  // Вне рабочей сетки — прижимаем линию к краю (сетку под «сейчас» не расширяем)
   if (currentMinutes < dayStartMinutes) return 0
   if (currentMinutes >= dayEndMinutes) {
     return Math.max(0, (dayEndMinutes - dayStartMinutes - 1) * SCHEDULE_MINUTE_HEIGHT_PX)
