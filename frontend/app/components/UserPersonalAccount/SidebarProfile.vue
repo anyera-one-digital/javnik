@@ -30,8 +30,8 @@ const avatarUrl = computed(() => user.value?.avatar_url || undefined)
 </script>
 
 <template>
-  <div v-if="!collapsed" class="pt-4 pb-2 pl-4 text-left max-md:pt-2">
-    <div class="hidden md:flex items-center justify-between gap-2 mb-[48px] pr-1">
+  <div v-if="!collapsed" class="pt-3 pb-2 pl-1 text-left max-md:pt-2">
+    <div class="hidden md:flex items-center justify-between gap-2 mb-5 pr-0.5">
       <NuxtLink :to="'/schedule'" class="text-sm font-bold text-highlighted tracking-tight shrink-0">
         Явьник
       </NuxtLink>

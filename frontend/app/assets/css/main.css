@@ -20,11 +20,24 @@
   --color-lime-950: #1a2e05;
 }
 
+:root {
+  --schedule-card-bg: #eceff3;
+  --schedule-card-fg: #111827;
+  --schedule-card-muted: #6b7280;
+  --schedule-today-col: rgba(15, 23, 42, 0.04);
+  --schedule-now: #a855f7;
+}
+
 .dark {
   --ui-bg: var(--ui-color-neutral-950);
   --ui-bg-muted: var(--ui-color-neutral-900);
   --ui-bg-elevated: var(--ui-color-neutral-900);
   --ui-bg-accented: var(--ui-color-neutral-800);
+  --schedule-card-bg: #2a2b30;
+  --schedule-card-fg: #f3f4f6;
+  --schedule-card-muted: #9ca3af;
+  --schedule-today-col: rgba(255, 255, 255, 0.04);
+  --schedule-now: #c084fc;
 }
 
 /* Единый акцентный цвет — Tailwind lime-600 (#65a30d) */

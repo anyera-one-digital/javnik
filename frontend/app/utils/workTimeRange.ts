@@ -57,17 +57,23 @@ export function computeWorkTimeRange(
 
   for (const schedule of scheduleList) {
     if (schedule.type === 'workday' && schedule.startTime && schedule.endTime) {
-      ({ minHour, maxHour, maxEndMinute } = absorbInterval(
+      const next = absorbInterval(
         minHour, maxHour, maxEndMinute, schedule.startTime, schedule.endTime
-      ))
+      )
+      minHour = next.minHour
+      maxHour = next.maxHour
+      maxEndMinute = next.maxEndMinute
     }
   }
 
   for (const booking of bookingList) {
     if (booking.startTime && booking.endTime) {
-      ({ minHour, maxHour, maxEndMinute } = absorbInterval(
+      const next = absorbInterval(
         minHour, maxHour, maxEndMinute, booking.startTime, booking.endTime
-      ))
+      )
+      minHour = next.minHour
+      maxHour = next.maxHour
+      maxEndMinute = next.maxEndMinute
     }
   }
 
@@ -77,10 +83,13 @@ export function computeWorkTimeRange(
     const endTotal = sh * 60 + sm + event.duration
     const endH = Math.floor(endTotal / 60)
     const endM = endTotal % 60
-    const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
-    ({ minHour, maxHour, maxEndMinute } = absorbInterval(
-      minHour, maxHour, maxEndMinute, event.startTime, endTime
-    ))
+    const eventEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
+    const next = absorbInterval(
+      minHour, maxHour, maxEndMinute, event.startTime, eventEndTime
+    )
+    minHour = next.minHour
+    maxHour = next.maxHour
+    maxEndMinute = next.maxEndMinute
   }
 
   if (minHour === null || maxHour === null) {

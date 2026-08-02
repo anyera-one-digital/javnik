@@ -68,11 +68,15 @@ export function useSchedulePageDate() {
       }
     }
 
-    if (route.path === '/schedule' && route.query.date === dateKey) {
+    if (
+      route.path === '/schedule'
+      && route.query.date === dateKey
+      && (!query.view || route.query.view === query.view)
+    ) {
       return
     }
 
-    await router.push({
+    await router.replace({
       path: '/schedule',
       query
     })

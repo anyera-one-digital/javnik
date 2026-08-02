@@ -1,17 +1,26 @@
 /**
  * Базовый URL API для клиентских запросов.
- * В production — пустая строка (относительные пути через nginx).
- * В dev — localhost или значение из runtimeConfig.
+ * Пути в коде уже вида `/api/auth/...`, поэтому:
+ * - '' / относительный origin через nginx
+ * - 'http://backend:8000' на сервере
+ * - значение `/api` нельзя клеить ещё раз (получится /api/api/...)
  */
 export function getClientApiBase(): string {
   const config = useRuntimeConfig()
   const base = config.public.apiBase
 
-  if (base !== undefined && base !== null) {
-    return base
+  if (base === undefined || base === null || base === '') {
+    return ''
   }
 
-  return import.meta.dev ? 'http://localhost:8000' : ''
+  const normalized = String(base).replace(/\/$/, '')
+
+  // В Docker часто ставят NUXT_PUBLIC_API_BASE_URL=/api — это префикс nginx, не origin.
+  if (normalized === '/api') {
+    return ''
+  }
+
+  return normalized
 }
 
 /**

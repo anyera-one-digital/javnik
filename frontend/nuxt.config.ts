@@ -8,6 +8,12 @@ export default defineNuxtConfig({
     '@vueuse/nuxt'
   ],
 
+  components: [
+    { path: '~/components/yavnik-landing', pathPrefix: false, priority: 10 },
+    { path: '~/components/yavnik-landing/ui', pathPrefix: false, priority: 10 },
+    '~/components'
+  ],
+
   devtools: {
     enabled: true
   },
@@ -24,7 +30,8 @@ export default defineNuxtConfig({
     // Для production: пустая строка (относительные пути)
     // Для development: http://localhost:8000
     public: {
-      apiBase: process.env.NODE_ENV === 'production' ? '' : (process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8000')
+      // Пустая строка = относительные /api/** через nginx (не дублировать /api в base)
+      apiBase: process.env.NUXT_PUBLIC_API_BASE_URL ?? ''
     }
   },
 
@@ -74,14 +81,22 @@ export default defineNuxtConfig({
 
   vite: {
     optimizeDeps: {
-      include: ['date-fns', '@unovis/vue', '@unovis/ts', 'vue']
+      include: ['date-fns', '@unovis/vue', '@unovis/ts', 'vue', 'gsap', 'reka-ui']
     },
     resolve: {
       dedupe: ['vue', '@vue/runtime-core']
     },
     server: {
+      watch: {
+        // Docker Desktop на macOS часто шлёт ложные fs-events → лишние HMR/рыки UI
+        usePolling: false,
+        ignored: ['**/node_modules/**', '**/.git/**']
+      },
       hmr: {
-        timeout: 120000 // 2 минуты вместо 60 секунд
+        // Доступ через nginx :8765 — клиент должен ходить на тот же порт
+        clientPort: 8765,
+        protocol: 'ws',
+        timeout: 120000
       }
     }
   },

@@ -61,7 +61,8 @@ services:
     environment:
       NODE_ENV: development
       API_BASE_URL: http://backend:8000
-      NUXT_PUBLIC_API_BASE_URL: /api
+      # Пусто: пути уже /api/... через nginx. Не ставить /api — будет /api/api/...
+      NUXT_PUBLIC_API_BASE_URL: ""
     depends_on:
       - backend
     networks:

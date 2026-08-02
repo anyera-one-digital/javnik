@@ -3,6 +3,7 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameDay, 
 import { ru } from 'date-fns/locale'
 import { formatWeekdayShort } from '~/utils'
 import { computeWorkTimeRange } from '~/utils/workTimeRange'
+import { getBookingColorHex } from '~/utils/bookingColors'
 import type { Event, Service, User, Booking, WorkSchedule } from '~/types'
 import BookingModal from '~/components/UserPublicPage/public/BookingModal.vue'
 import PublicPageFooter from '~/components/UserPublicPage/PublicPageFooter.vue'
@@ -394,25 +395,10 @@ function getBookingPosition(booking: Booking, date: Date): { top: string, height
 }
 
 /**
- * Цвет брони по статусу и услуге (как во внутреннем расписании)
+ * Цвет брони (hex) — как во внутреннем расписании
  */
-function getBookingColorClass(booking: Booking): string {
-  if (booking.status !== 'confirmed') {
-    if (booking.status === 'pending') return 'bg-yellow-500'
-    if (booking.status === 'cancelled') return 'bg-red-500'
-    if (booking.status === 'completed') return 'bg-blue-500'
-    return 'bg-yellow-500'
-  }
-  const serviceName = (booking.serviceName || '').toLowerCase()
-  if (serviceName.includes('маникюр') || serviceName.includes('маникюра')) return 'bg-blue-500'
-  if (serviceName.includes('педикюр') || serviceName.includes('педикюра')) return 'bg-indigo-500'
-  if (serviceName.includes('стрижк')) return 'bg-green-600'
-  if (serviceName.includes('наращивани')) return 'bg-purple-500'
-  if (serviceName.includes('окрашивани') || serviceName.includes('окраск')) return 'bg-pink-500'
-  if (serviceName.includes('укладк')) return 'bg-cyan-500'
-  if (serviceName.includes('брови') || serviceName.includes('бров')) return 'bg-orange-500'
-  if (serviceName.includes('ресниц')) return 'bg-rose-500'
-  return 'bg-teal-500'
+function getBookingColorStyle(booking: Booking): { backgroundColor: string } {
+  return { backgroundColor: getBookingColorHex(booking, services.value) }
 }
 
 // Вычисляем длительность бронирования
@@ -905,14 +891,11 @@ watch([publicUser, userError], ([user, error]) => {
                   v-for="booking in getBookingsForDate(selectedDate)"
                   :key="booking.id"
                   class="absolute left-2 right-2 flex flex-col overflow-hidden rounded-md text-white text-sm cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"
-                  :style="{ ...getBookingPosition(booking, selectedDate), boxSizing: 'border-box', maxHeight: '100%' }"
-                  :class="[
-                    getBookingColorClass(booking),
-                    {
-                      'p-2': !isShortBookingBlock(booking),
-                      'px-1.5 py-0.5': isShortBookingBlock(booking)
-                    }
-                  ]"
+                  :style="{ ...getBookingPosition(booking, selectedDate), ...getBookingColorStyle(booking), boxSizing: 'border-box', maxHeight: '100%' }"
+                  :class="{
+                    'p-2': !isShortBookingBlock(booking),
+                    'px-1.5 py-0.5': isShortBookingBlock(booking)
+                  }"
                 >
                   <div
                     v-if="isShortBookingBlock(booking)"
@@ -1043,11 +1026,8 @@ watch([publicUser, userError], ([user, error]) => {
                       v-for="booking in getBookingsForDate(day)"
                       :key="booking.id"
                       class="absolute left-1 right-1 flex flex-col overflow-hidden rounded-md text-white text-xs cursor-pointer hover:opacity-90 transition-opacity"
-                      :style="{ ...getBookingPosition(booking, day), boxSizing: 'border-box', maxHeight: '100%' }"
-                      :class="[
-                        getBookingColorClass(booking),
-                        isShortBookingBlock(booking) ? 'px-1 py-0.5' : 'p-1.5'
-                      ]"
+                      :style="{ ...getBookingPosition(booking, day), ...getBookingColorStyle(booking), boxSizing: 'border-box', maxHeight: '100%' }"
+                      :class="isShortBookingBlock(booking) ? 'px-1 py-0.5' : 'p-1.5'"
                     >
                       <div
                         v-if="isShortBookingBlock(booking)"

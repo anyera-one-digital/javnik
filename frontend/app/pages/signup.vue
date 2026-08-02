@@ -4,6 +4,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 import { zodPhoneRequired } from '~/utils/phone'
 import { workScheduleTemplateList, type WorkScheduleTemplateId, type ShiftCycleId } from '~/utils/workScheduleTemplates'
 import { format } from 'date-fns'
+import { clearSignupFlow, readSignupFlow, writeSignupFlow } from '~/utils/authFlowStorage'
 
 definePageMeta({
   layout: 'auth',
@@ -15,11 +16,24 @@ useSeoMeta({
   description: 'Создайте аккаунт, чтобы начать'
 })
 
-const config = useRuntimeConfig()
-const { register, registerCredentials, verifyEmail, resendVerificationCode, completeProfile, patchProfile } = useAuth()
+const { register, registerCredentials, verifyEmail, resendVerificationCode, completeProfile, patchProfile, isAuthenticated, user } = useAuth()
 const router = useRouter()
+const route = useRoute()
 const step = ref(1)
 const pendingEmail = ref('')
+
+function isSignupTempUsername(username: string | undefined): boolean {
+  return !!username && /^u_[a-f0-9]{12}$/.test(username)
+}
+
+function persistSignupFlow() {
+  writeSignupFlow({
+    step: step.value,
+    pendingEmail: pendingEmail.value,
+    email: step1Form.email || undefined,
+    first_name: step1Form.first_name || undefined
+  })
+}
 
 // Шаг 1 — email, имя, согласия
 const step1Loading = ref(false)
@@ -36,6 +50,39 @@ const step1Form = reactive<Partial<Step1Schema>>({
   offer_accepted: false,
   privacy_accepted: false
 })
+
+// Восстановить прогресс после remount / reload (иначе шаг с кодом обнуляется)
+if (import.meta.client) {
+  const restored = readSignupFlow()
+  if (restored) {
+    if (restored.email) step1Form.email = restored.email
+    if (restored.first_name) step1Form.first_name = restored.first_name
+    pendingEmail.value = restored.pendingEmail || ''
+    step.value = restored.step >= 1 && restored.step <= 5 ? restored.step : 1
+  }
+  if (typeof route.query.email === 'string' && route.query.email) {
+    step1Form.email = route.query.email
+  }
+  if (typeof route.query.name === 'string' && route.query.name) {
+    step1Form.first_name = route.query.name
+  }
+  // После verify уже есть сессия с временным username — шаги 1–2 пропускаем
+  if (isAuthenticated.value && isSignupTempUsername(user.value?.username) && step.value < 3) {
+    step.value = 3
+    pendingEmail.value = user.value?.email || pendingEmail.value
+  }
+  if (step.value === 2 && !pendingEmail.value) {
+    step.value = 1
+  }
+  persistSignupFlow()
+}
+
+watch(
+  [step, pendingEmail, () => step1Form.email, () => step1Form.first_name],
+  () => {
+    persistSignupFlow()
+  }
+)
 
 // Шаг 2 — код
 const digits = ref<string[]>(['', '', '', '', '', ''])
@@ -90,6 +137,9 @@ const step5Form = reactive<Partial<Step5Schema>>({
 })
 
 onMounted(async () => {
+  if (step.value === 2) {
+    nextTick(() => inputRefs.value[0]?.focus())
+  }
   specialtiesLoading.value = true
   try {
     const data = await $fetch<{ id: number; name: string; order: number; specialties: { id: number; name: string; order: number }[] }[]>(
@@ -116,6 +166,7 @@ async function onStep1Submit(payload: FormSubmitEvent<Step1Schema>) {
     if (result.success && result.needsVerification && result.email) {
       pendingEmail.value = result.email
       step.value = 2
+      persistSignupFlow()
       nextTick(() => {
         digits.value = ['', '', '', '', '', '']
         inputRefs.value[0]?.focus()
@@ -133,6 +184,7 @@ async function onVerify() {
     const result = await verifyEmail(pendingEmail.value, code.value)
     if (result.success) {
       step.value = 3
+      persistSignupFlow()
     }
   } finally {
     isVerifying.value = false
@@ -148,6 +200,7 @@ async function onStep3Submit(payload: FormSubmitEvent<Step3Schema>) {
     })
     if (result.success) {
       step.value = 4
+      persistSignupFlow()
     }
   } finally {
     step3Loading.value = false
@@ -198,6 +251,7 @@ function goBackToStep1() {
   step.value = 1
   pendingEmail.value = ''
   digits.value = ['', '', '', '', '', '']
+  clearSignupFlow()
 }
 
 async function onStep4Submit(payload: FormSubmitEvent<Step4Schema>) {
@@ -210,6 +264,7 @@ async function onStep4Submit(payload: FormSubmitEvent<Step4Schema>) {
     })
     if (result.success) {
       step.value = 5
+      persistSignupFlow()
     }
   } finally {
     step4Loading.value = false
@@ -226,6 +281,7 @@ async function onStep5Submit(payload: FormSubmitEvent<Step5Schema>) {
       shift_anchor_date: t === 'shift-cycle' ? (payload.data.shift_anchor_date ?? null) : null
     })
     if (r.success) {
+      clearSignupFlow()
       router.push('/schedule')
     }
   } finally {

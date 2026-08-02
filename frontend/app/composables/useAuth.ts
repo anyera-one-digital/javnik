@@ -61,6 +61,7 @@ export const useAuth = () => {
   const accessToken = useState<string | null>('auth.accessToken', () => null)
   const refreshToken = useState<string | null>('auth.refreshToken', () => null)
   const user = useState<User | null>('auth.user', () => null)
+  const storageListenerBound = useState<boolean>('auth.storageListenerBound', () => false)
 
   // Функция для загрузки данных из localStorage
   const loadFromStorage = () => {
@@ -70,16 +71,28 @@ export const useAuth = () => {
         const storedRefreshToken = localStorage.getItem('auth.refreshToken')
         const storedUser = localStorage.getItem('auth.user')
 
-        // Загружаем токены, даже если они уже есть (для синхронизации)
-        if (storedAccessToken) {
+        // Не перезаписывать теми же значениями — иначе новый объект user → лишний re-render
+        if (storedAccessToken && storedAccessToken !== accessToken.value) {
           accessToken.value = storedAccessToken
         }
-        if (storedRefreshToken) {
+        if (storedRefreshToken && storedRefreshToken !== refreshToken.value) {
           refreshToken.value = storedRefreshToken
         }
         if (storedUser) {
           try {
-            user.value = normalizeAuthUser(JSON.parse(storedUser))
+            const parsed = normalizeAuthUser(JSON.parse(storedUser))
+            const prev = user.value
+            const same =
+              prev &&
+              prev.id === parsed.id &&
+              prev.email === parsed.email &&
+              prev.username === parsed.username &&
+              prev.avatar_url === parsed.avatar_url &&
+              prev.phone === parsed.phone &&
+              prev.first_name === parsed.first_name
+            if (!same) {
+              user.value = parsed
+            }
           } catch {
             // Игнорируем ошибки парсинга
           }
@@ -90,55 +103,35 @@ export const useAuth = () => {
     }
   }
 
-  // Инициализация при первом использовании на клиенте
+  // Инициализация один раз на клиенте (не вешать storage на каждый вызов useAuth)
   if (process.client) {
     loadFromStorage()
-    
-    // Слушаем изменения в других вкладках
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'auth.accessToken') {
-        accessToken.value = e.newValue
-      }
-      if (e.key === 'auth.refreshToken') {
-        refreshToken.value = e.newValue
-      }
-      if (e.key === 'auth.user') {
-        try {
-          user.value = e.newValue ? normalizeAuthUser(JSON.parse(e.newValue)) : null
-        } catch {
-          user.value = null
+
+    if (!storageListenerBound.value) {
+      storageListenerBound.value = true
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'auth.accessToken') {
+          accessToken.value = e.newValue
         }
-      }
-    })
+        if (e.key === 'auth.refreshToken') {
+          refreshToken.value = e.newValue
+        }
+        if (e.key === 'auth.user') {
+          try {
+            user.value = e.newValue ? normalizeAuthUser(JSON.parse(e.newValue)) : null
+          } catch {
+            user.value = null
+          }
+        }
+      })
+    }
   }
 
-  // Проверка авторизации
+  // Проверка авторизации (без side-effects в computed — только чтение)
   const isAuthenticated = computed(() => {
-    // На сервере всегда false
     if (process.server) {
       return false
     }
-    
-    // На клиенте проверяем наличие токена и пользователя
-    // Если токен есть, но пользователя нет, пытаемся загрузить
-    if (accessToken.value && !user.value) {
-      loadFromStorage()
-    }
-    
-    // Если пользователь есть, но токена нет, пытаемся загрузить
-    if (user.value && !accessToken.value) {
-      loadFromStorage()
-    }
-    
-    // Если ничего нет, но в localStorage есть данные, загружаем
-    if (!user.value && !accessToken.value && process.client) {
-      const storedToken = localStorage.getItem('auth.accessToken')
-      const storedUser = localStorage.getItem('auth.user')
-      if (storedToken && storedUser) {
-        loadFromStorage()
-      }
-    }
-    
     return !!(user.value && accessToken.value)
   })
 
@@ -153,12 +146,8 @@ export const useAuth = () => {
       localStorage.setItem('auth.accessToken', authData.tokens.access)
       localStorage.setItem('auth.refreshToken', authData.tokens.refresh)
       localStorage.setItem('auth.user', JSON.stringify(normalizedUser))
-      
-      // Триггерим событие storage для синхронизации между вкладками
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'auth.accessToken',
-        newValue: authData.tokens.access
-      }))
+      // Не диспатчить StorageEvent в этом же окне — storage и так для других вкладок;
+      // ручной dispatch давал лишние обновления refs в текущей вкладке.
     }
   }
 

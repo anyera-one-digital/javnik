@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { clearLoginFlow, readLoginFlow, writeLoginFlow } from '~/utils/authFlowStorage'
 
 definePageMeta({
   layout: 'auth',
@@ -22,8 +23,31 @@ const digits = ref<string[]>(['', '', '', '', '', ''])
 const inputRefs = ref<(HTMLInputElement | null)[]>(Array(6).fill(null))
 const isVerifying = ref(false)
 const isResending = ref(false)
+const skipDigitReset = ref(false)
 
 const code = computed(() => digits.value.join(''))
+
+function persistLoginFlow() {
+  writeLoginFlow({
+    step: step.value,
+    pendingEmail: pendingEmail.value
+  })
+}
+
+if (import.meta.client) {
+  const restored = readLoginFlow()
+  if (restored?.step === 2 && restored.pendingEmail) {
+    skipDigitReset.value = true
+    pendingEmail.value = restored.pendingEmail
+    step.value = 2
+  }
+}
+
+onMounted(() => {
+  if (step.value === 2) {
+    nextTick(() => inputRefs.value[0]?.focus())
+  }
+})
 
 const fields = [{
   name: 'email',
@@ -65,11 +89,13 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
   try {
     const result = await login(payload.data.email, payload.data.password)
     if (result.success) {
+      clearLoginFlow()
       const redirectTo = route.query.redirect as string || '/schedule'
       router.push(redirectTo)
     } else if (result.needsVerification && result.email) {
       pendingEmail.value = result.email
       step.value = 2
+      persistLoginFlow()
     }
   } finally {
     isLoading.value = false
@@ -82,6 +108,7 @@ async function onVerify() {
   try {
     const result = await verifyEmail(pendingEmail.value, code.value)
     if (result.success) {
+      clearLoginFlow()
       const redirectTo = route.query.redirect as string || '/schedule'
       router.push(redirectTo)
     }
@@ -125,7 +152,12 @@ function onDigitPaste(e: ClipboardEvent) {
 
 watch(step, (s) => {
   if (s === 2) {
-    digits.value = ['', '', '', '', '', '']
+    if (skipDigitReset.value) {
+      skipDigitReset.value = false
+    } else {
+      digits.value = ['', '', '', '', '', '']
+    }
+    persistLoginFlow()
     nextTick(() => inputRefs.value[0]?.focus())
   }
 })
@@ -143,6 +175,7 @@ function goBack() {
   step.value = 1
   pendingEmail.value = ''
   digits.value = ['', '', '', '', '', '']
+  clearLoginFlow()
 }
 </script>
 

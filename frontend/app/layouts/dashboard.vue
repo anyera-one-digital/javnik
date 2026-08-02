@@ -18,12 +18,23 @@ function toggleSidebarTheme() {
 
 const { selectedDate: selectedScheduleDate, pushScheduleDate } = useSchedulePageDate()
 
-const { getAuthHeaders } = useAuth()
-const { data: scheduleBookings } = await useFetch<Booking[]>('/api/bookings/', {
+const { getAuthHeaders, accessToken, user, logout } = useAuth()
+/** Только на клиенте и только с токеном — иначе Django отвечает 401 и засоряет консоль */
+const { data: scheduleBookings, refresh: refreshScheduleBookings } = await useFetch<Booking[]>('/api/bookings/', {
   default: () => [],
   lazy: true,
+  server: false,
+  immediate: false,
   headers: () => getAuthHeaders()
 })
+
+watch(
+  accessToken,
+  (token) => {
+    if (token) void refreshScheduleBookings()
+  },
+  { immediate: true }
+)
 
 function handleDateSelect(date: Date) {
   void pushScheduleDate(startOfDay(date)).catch(() => {})
@@ -50,8 +61,6 @@ const links = [[{
   to: '/services',
   onSelect: () => { open.value = false }
 }]] satisfies NavigationMenuItem[][]
-
-const { user, logout } = useAuth()
 
 const accountLinks = computed<NavigationMenuItem[][]>(() => [[{
   label: 'Тарифный план',
@@ -103,16 +112,16 @@ onMounted(async () => {
 <template>
   <UDashboardGroup
     unit="rem"
-    storage-key="dashboard-v3"
+    storage-key="dashboard-v4-compact"
     class="dashboard-page !items-stretch w-full min-h-0"
   >
     <UDashboardSidebar
       id="default"
       v-model:open="open"
       collapsible
-      :default-size="23"
-      :min-size="22.5"
-      :max-size="24.5"
+      :default-size="16"
+      :min-size="14"
+      :max-size="18"
       class="bg-elevated/25 h-full min-h-0 self-stretch"
       :ui="{ header: 'max-md:flex max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-3 max-md:border-b max-md:border-default' }"
     >
@@ -139,7 +148,7 @@ onMounted(async () => {
       </template>
 
       <template #default="{ collapsed }">
-        <div class="dashboard-sidebar-content flex h-full min-h-0 flex-col flex-1 overflow-y-auto px-[36px]">
+        <div class="dashboard-sidebar-content flex h-full min-h-0 flex-col flex-1 overflow-y-auto px-3 md:px-3.5">
           <SidebarProfile :collapsed="collapsed" />
 
           <ScheduleSidebarCalendar
@@ -157,11 +166,11 @@ onMounted(async () => {
             color="neutral"
             tooltip
             popover
-            class="px-4 mb-0"
-            :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
+            class="px-1 mb-0"
+            :ui="{ item: 'text-[11px] py-0.5', list: 'gap-0.5', linkLeadingIcon: 'shrink-0 size-4' }"
           />
 
-          <div class="border-t border-default my-[8px] mx-4" />
+          <div class="border-t border-default my-2 mx-1" />
 
           <UNavigationMenu
             :collapsed="collapsed"
@@ -170,11 +179,11 @@ onMounted(async () => {
             color="neutral"
             tooltip
             popover
-            class="px-4 mb-0"
-            :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
+            class="px-1 mb-0"
+            :ui="{ item: 'text-[11px] py-0.5', list: 'gap-0.5', linkLeadingIcon: 'shrink-0 size-4' }"
           />
 
-          <div class="border-t border-default my-[8px] mx-4" />
+          <div class="border-t border-default my-2 mx-1" />
 
           <UNavigationMenu
             :collapsed="collapsed"
@@ -183,14 +192,14 @@ onMounted(async () => {
             color="neutral"
             tooltip
             popover
-            class="px-4 mb-0"
-            :ui="{ item: 'text-[10px] py-0', list: 'gap-0', linkLeadingIcon: 'shrink-0 size-[15px]' }"
+            class="px-1 mb-0"
+            :ui="{ item: 'text-[11px] py-0.5', list: 'gap-0.5', linkLeadingIcon: 'shrink-0 size-4' }"
           />
         </div>
       </template>
     </UDashboardSidebar>
 
-    <div class="h-full min-h-0 min-w-0 flex-1 self-stretch overflow-auto md:pr-[36px]">
+    <div class="h-full min-h-0 min-w-0 flex-1 self-stretch overflow-auto md:pr-4">
       <slot />
     </div>
   </UDashboardGroup>

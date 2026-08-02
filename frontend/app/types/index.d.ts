@@ -107,6 +107,7 @@ export interface Event {
   user?: number
   service?: number
   serviceId?: number | null
+  serviceName?: string
   name: string
   description?: string
   date: string
