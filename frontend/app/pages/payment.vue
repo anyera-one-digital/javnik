@@ -8,6 +8,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Тарифный план'
+})
+
 const { fetchProfile, getAuthHeaders } = useAuth()
 const toast = useToast()
 const config = useRuntimeConfig()

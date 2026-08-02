@@ -4,6 +4,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Уведомления'
+})
+
 const state = reactive<{ [key: string]: boolean }>({
   email: true,
   desktop: false

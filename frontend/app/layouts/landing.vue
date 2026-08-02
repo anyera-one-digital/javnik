@@ -16,12 +16,14 @@ onBeforeUnmount(() => {
 
 useSeoMeta({
   title: 'Явьник — онлайн-запись для частных специалистов',
+  titleTemplate: '%s',
   description: 'Личная страница, онлайн-расписание, напоминания и клиентская база — в одном спокойном сервисе.',
   ogTitle: 'Явьник — запись клиентов без переписки',
   ogDescription: 'Создайте страницу, откройте расписание и принимайте записи онлайн.',
   ogType: 'website',
   twitterCard: 'summary_large_image'
 })
+
 
 useHead({
   htmlAttrs: {
@@ -36,7 +38,9 @@ useHead({
     { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' }
   ],
   link: [
-    { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
+    { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }
   ],
   script: [
     {

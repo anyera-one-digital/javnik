@@ -8,6 +8,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Безопасность'
+})
+
 const { user, fetchProfile, deleteAccount, getAuthHeaders } = useAuth()
 const toast = useToast()
 const config = useRuntimeConfig()

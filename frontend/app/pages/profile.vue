@@ -8,6 +8,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Профиль'
+})
+
 const { user, fetchProfile, uploadAvatar, getAuthHeaders } = useAuth()
 const toast = useToast()
 const fileRef = ref<HTMLInputElement>()

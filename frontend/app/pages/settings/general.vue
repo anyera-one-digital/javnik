@@ -4,6 +4,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Общие настройки'
+})
+
 const { user, patchProfile, fetchProfile } = useAuth()
 
 const showPublicSchedule = ref(true)

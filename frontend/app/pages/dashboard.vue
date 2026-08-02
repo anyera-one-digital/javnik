@@ -13,6 +13,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Аналитика'
+})
+
 const { hasProAccess, ensureSubscription } = useSubscription()
 
 onMounted(() => {

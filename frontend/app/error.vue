@@ -13,7 +13,10 @@ useSeoMeta({
 useHead({
   htmlAttrs: {
     lang: 'ru'
-  }
+  },
+  link: [
+    { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
+  ]
 })
 </script>
 

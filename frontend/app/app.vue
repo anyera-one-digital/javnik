@@ -12,7 +12,9 @@ useHead({
     { key: 'theme-color', name: 'theme-color', content: color }
   ],
   link: [
-    { rel: 'icon', href: '/favicon.ico' }
+    { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }
   ],
   htmlAttrs: {
     lang: 'ru'
@@ -20,9 +22,7 @@ useHead({
 })
 
 useSeoMeta({
-  titleTemplate: '%s - Bookly',
-  ogImage: 'https://ui.nuxt.com/assets/templates/nuxt/saas-light.png',
-  twitterImage: 'https://ui.nuxt.com/assets/templates/nuxt/saas-light.png',
+  titleTemplate: '%s — Явьник',
   twitterCard: 'summary_large_image'
 })
 </script>

@@ -7,6 +7,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Оплата успешна'
+})
+
 const route = useRoute()
 const { fetchProfile } = useAuth()
 

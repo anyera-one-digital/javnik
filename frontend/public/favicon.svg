@@ -1,4 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="32" fill="#17171a"/>
-  <path d="M19 17h9.2l4.5 10.1L37.1 17H46L36.8 36.7V47h-8.9V36.9L19 17Z" fill="#f7f7f4"/>
+  <rect width="64" height="64" fill="#000"/>
+  <text
+    x="32"
+    y="46"
+    text-anchor="middle"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-size="42"
+    font-weight="700"
+    fill="#fff"
+  >Я</text>
 </svg>

@@ -4,6 +4,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Оплата не завершена'
+})
+
 const route = useRoute()
 
 const orderId = computed(() => {

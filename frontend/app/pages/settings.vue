@@ -6,6 +6,10 @@ definePageMeta({
   middleware: 'auth'
 })
 
+useSeoMeta({
+  title: 'Настройки'
+})
+
 const links = [[{
   label: 'Общие',
   icon: 'i-lucide-sliders-horizontal',
