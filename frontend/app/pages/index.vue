@@ -45,7 +45,7 @@ const screens = computed(() => [
     title: 'Свободные слоты видны без переписки',
     image: theme.value === 'dark' ? '/images/calendar-dark.png' : '/images/calendar-light.png',
     alt: 'Недельное расписание в Явьнике',
-    video: null as string | null,
+    video: '/videos/showcase-schedule.mp4' as string | null,
     caption: 'Неделя, день и свободные окна — на одном экране'
   },
   {
@@ -54,7 +54,7 @@ const screens = computed(() => [
     title: 'Видно, сколько записей и как растет поток',
     image: theme.value === 'dark' ? '/images/calendar-dark.png' : '/images/calendar-light.png',
     alt: 'Аналитика в кабинете Явьник',
-    video: null as string | null,
+    video: '/videos/showcase-analytics.mp4' as string | null,
     caption: 'Записи, выручка и загрузка без сложных отчётов'
   },
   {
@@ -63,7 +63,7 @@ const screens = computed(() => [
     title: 'Все клиенты и история визитов в одном месте',
     image: theme.value === 'dark' ? '/images/calendar-dark.png' : '/images/calendar-light.png',
     alt: 'Список клиентов в Явьнике',
-    video: null as string | null,
+    video: '/videos/showcase-clients.mp4' as string | null,
     caption: 'Контакты и история визитов всегда под рукой'
   },
   {
@@ -72,7 +72,7 @@ const screens = computed(() => [
     title: 'Услуги и длительность настраиваются один раз',
     image: '/images/pricing.png',
     alt: 'Услуги и тарифы в Явьнике',
-    video: null as string | null,
+    video: '/videos/showcase-services.mp4' as string | null,
     caption: 'Название, длительность и цена — один раз настроили'
   }
 ]);

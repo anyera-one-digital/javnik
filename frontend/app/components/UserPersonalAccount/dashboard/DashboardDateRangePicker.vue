@@ -134,7 +134,7 @@ const selectRange = (range: { days?: number, months?: number, years?: number }) 
 
         <UCalendar
           v-model="calendarRange"
-          class="p-2"
+          class="p-2 analytics-range-calendar"
           color="neutral"
           :number-of-months="2"
           :week-starts-on="1"

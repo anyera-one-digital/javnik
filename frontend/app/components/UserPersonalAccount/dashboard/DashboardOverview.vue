@@ -13,13 +13,6 @@ const props = defineProps<{
 
 const { getAuthHeaders } = useAuth()
 
-const formatMoney = (value: number) =>
-  new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    maximumFractionDigits: 0
-  }).format(value)
-
 const rangeKey = computed(() => {
   const start = format(props.range.start, 'yyyy-MM-dd')
   const end = format(props.range.end, 'yyyy-MM-dd')
@@ -54,14 +47,6 @@ const overview = computed(() => data.value)
   <div class="space-y-3">
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       <div class="analytics-card p-4 sm:p-5">
-        <p class="text-xs text-muted mb-2">Доход</p>
-        <p class="text-2xl sm:text-3xl font-semibold text-highlighted tracking-tight">
-          <template v-if="pending">—</template>
-          <template v-else>{{ formatMoney(overview.revenue.value) }}</template>
-        </p>
-      </div>
-
-      <div class="analytics-card p-4 sm:p-5">
         <p class="text-xs text-muted mb-2">Записи</p>
         <p class="text-2xl sm:text-3xl font-semibold text-highlighted tracking-tight">
           <template v-if="pending">—</template>
@@ -95,6 +80,14 @@ const overview = computed(() => data.value)
             {{ overview.successRate }}%
           </div>
         </div>
+      </div>
+
+      <div class="analytics-card p-4 sm:p-5">
+        <p class="text-xs text-muted mb-2">Отмены</p>
+        <p class="text-2xl sm:text-3xl font-semibold text-highlighted tracking-tight">
+          <template v-if="pending">—</template>
+          <template v-else>{{ overview.periodSummary?.cancellations ?? 0 }}</template>
+        </p>
       </div>
     </div>
 

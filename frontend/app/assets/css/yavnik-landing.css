@@ -922,21 +922,9 @@ html.using-pointer :where(a, button, summary, [role='button'], [role='tab'], [ro
 .showcase-demo__titles { position: absolute; left: 18px; right: 18px; bottom: 18px; max-width: 420px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.14); border-radius: 16px; background: rgba(12,12,16,.82); color: #fff; backdrop-filter: blur(14px); pointer-events: none; }
 .showcase-demo__titles small { display: block; margin-bottom: 4px; color: rgba(255,255,255,.58); font-size: 8px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .showcase-demo__titles strong { display: block; font-size: 13px; line-height: 1.4; font-weight: 700; }
-.showcase-demo__expand { position: absolute; top: 14px; right: 14px; z-index: 2; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: rgba(12,12,16,.72); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; backdrop-filter: blur(12px); transition: background .2s ease, transform .2s var(--ease); }
-.showcase-demo__expand:hover { background: rgba(12,12,16,.9); transform: translateY(-1px); }
-.showcase-demo__soon { position: absolute; top: 14px; right: 14px; z-index: 2; height: 28px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: 999px; background: rgba(12,12,16,.45); color: rgba(255,255,255,.72); font-size: 10px; font-weight: 700; letter-spacing: .04em; pointer-events: none; }
 .showcase-caption { position: absolute; right: 21px; bottom: 19px; max-width: 320px; padding: 15px 18px; border: 1px solid rgba(255,255,255,.15); border-radius: 16px; background: rgba(18,18,22,.86); color: #fff; backdrop-filter: blur(15px); }
 .showcase-caption small { display: block; margin-bottom: 4px; color: rgba(255,255,255,.55); font-size: 8px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .showcase-caption strong { font-size: 12px; line-height: 1.4; }
-.showcase-theater__overlay { position: fixed; inset: 0; z-index: 80; background: rgba(8,8,12,.72); backdrop-filter: blur(8px); }
-.showcase-theater { position: fixed; top: 50%; left: 50%; z-index: 81; width: min(960px, calc(100vw - 32px)); transform: translate(-50%, -50%); padding: 18px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: #141418; color: #f4f4f1; box-shadow: 0 40px 100px rgba(0,0,0,.45); outline: none; }
-.showcase-theater__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-.showcase-theater__title { margin: 0; font-size: 18px; font-weight: 800; }
-.showcase-theater__desc { margin: 4px 0 0; color: rgba(244,244,241,.55); font-size: 12px; }
-.showcase-theater__close { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; background: rgba(255,255,255,.06); color: #fff; cursor: pointer; }
-.showcase-theater__player { overflow: hidden; border-radius: 14px; background: #000; aspect-ratio: 16/9; }
-.showcase-theater__video { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; }
-.showcase-theater__hint { margin: 12px 0 0; display: inline-flex; align-items: center; gap: 8px; color: rgba(244,244,241,.55); font-size: 12px; }
 .screen-enter-active, .screen-leave-active { transition: opacity .35s ease, transform .45s var(--ease); }
 .screen-enter-from { opacity: 0; transform: translateY(12px) scale(.99); }
 .screen-leave-to { opacity: 0; transform: translateY(-8px) scale(.995); }
@@ -1385,8 +1373,6 @@ html.using-pointer :where(a, button, summary, [role='button'], [role='tab'], [ro
   .showcase-demo { width: 100%; }
   .showcase-window { width: 100%; aspect-ratio: 4/3; border-radius: 18px 18px 0 0; }
   .showcase-demo__titles { left: 10px; right: 10px; bottom: 10px; max-width: none; }
-  .showcase-demo__expand span { display: none; }
-  .showcase-theater { width: calc(100vw - 20px); padding: 14px; border-radius: 16px; }
   .audience-list { grid-template-columns: 1fr; }
   .audience-list article, .audience-list article:nth-child(2n) { border-right: 0; }
   .comparison-stack {

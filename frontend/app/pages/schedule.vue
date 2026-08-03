@@ -1171,8 +1171,9 @@ function openPublicProfilePreview() {
             >
               <UButton
                 icon="i-lucide-plus"
-                label="Новая запись"
                 size="sm"
+                square
+                aria-label="Новая запись"
                 class="shrink-0 !bg-violet-500 !text-white hover:!bg-violet-400 dark:!bg-violet-500 dark:hover:!bg-violet-400"
               />
             </UDropdownMenu>
@@ -1235,13 +1236,18 @@ function openPublicProfilePreview() {
                   :key="day.getTime()"
                   class="p-1.5 md:p-2 text-center cursor-pointer transition-colors"
                   :class="{
-                    'bg-gray-900/10 dark:bg-white/10': isSameDay(day, selectedDate),
+                    'bg-violet-500 text-white': isSameDay(day, selectedDate),
                     'hover:bg-elevated/50': !isSameDay(day, selectedDate),
                     'border-l border-default': index > 0
                   }"
                   @click="void selectScheduleDay(day)"
                 >
-                  <div class="text-xs text-muted">{{ formatWeekdayShort(day) }}</div>
+                  <div
+                    class="text-xs"
+                    :class="isSameDay(day, selectedDate) ? 'text-white/80' : 'text-muted'"
+                  >
+                    {{ formatWeekdayShort(day) }}
+                  </div>
                   <div class="text-sm font-medium">{{ format(day, 'd') }}</div>
                 </div>
               </div>

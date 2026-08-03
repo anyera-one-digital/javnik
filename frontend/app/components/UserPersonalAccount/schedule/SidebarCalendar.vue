@@ -121,8 +121,8 @@ function nextMonth() {
         class="aspect-square text-xs rounded-md transition-colors flex items-center justify-center cursor-pointer select-none"
         :class="[
           isCurrentMonth(day) ? 'text-highlighted' : 'text-dimmed',
-          isSelected(day) ? 'bg-gray-900 text-white font-semibold dark:bg-white dark:text-gray-900' : 'hover:bg-elevated',
-          isToday(day) && !isSelected(day) ? 'ring-2 ring-gray-900/50 dark:ring-white/50' : ''
+          isSelected(day) ? 'bg-violet-500 text-white font-semibold hover:bg-violet-400' : 'hover:bg-elevated',
+          isToday(day) && !isSelected(day) ? 'ring-2 ring-violet-500/50' : ''
         ]"
         @click="selectDate(day)"
       >
