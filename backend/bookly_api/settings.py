@@ -229,6 +229,9 @@ TBANK_API_URL = config(
     'TBANK_API_URL',
     default='https://securepay.tinkoff.ru/v2',
 )
+# Если на VPS/прокси ломается цепочка SSL к API Т‑Банка — временно TBANK_SSL_VERIFY=false
+TBANK_SSL_VERIFY = config('TBANK_SSL_VERIFY', default=True, cast=bool)
+TBANK_CA_BUNDLE = config('TBANK_CA_BUNDLE', default='')
 # Публичный URL фронта для SuccessURL / FailURL
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:4000')
 # Публичный URL API для webhook (если пусто — TBANK_NOTIFICATION_URL обязателен)

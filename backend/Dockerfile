@@ -6,12 +6,14 @@ FROM python:3.14-slim
 # Установка системных зависимостей
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    ca-certificates \
     libpq-dev \
     gcc \
     libjpeg-dev \
     zlib1g-dev \
     libfreetype6-dev \
     gosu \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

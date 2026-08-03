@@ -48,6 +48,19 @@ def verify_notification_token(payload: dict[str, Any], password: str) -> bool:
     return received == expected
 
 
+def _ssl_verify() -> bool | str:
+    """
+    Проверка SSL к API Т‑Банка.
+    На части VPS в цепочку вставляется свой CA → CERTIFICATE_VERIFY_FAILED.
+    TBANK_SSL_VERIFY=false отключает проверку (только если иначе не заводится).
+    TBANK_CA_BUNDLE=/path/to/ca.pem — свой CA.
+    """
+    bundle = str(getattr(settings, 'TBANK_CA_BUNDLE', '') or '').strip()
+    if bundle:
+        return bundle
+    return bool(getattr(settings, 'TBANK_SSL_VERIFY', True))
+
+
 def init_payment(
     *,
     order_id: str,
@@ -62,6 +75,9 @@ def init_payment(
     terminal_key = settings.TBANK_TERMINAL_KEY
     password = settings.TBANK_PASSWORD
     api_url = settings.TBANK_API_URL.rstrip('/')
+    verify = _ssl_verify()
+    if verify is False:
+        logger.warning('T-Bank Init: SSL verification is DISABLED (TBANK_SSL_VERIFY=false)')
 
     payload: dict[str, Any] = {
         'TerminalKey': terminal_key,
@@ -77,13 +93,29 @@ def init_payment(
     }
     payload['Token'] = build_token(payload, password)
 
-    response = requests.post(
-        f'{api_url}/Init',
-        json=payload,
-        timeout=30,
-        headers={'Content-Type': 'application/json'},
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            f'{api_url}/Init',
+            json=payload,
+            timeout=30,
+            headers={'Content-Type': 'application/json'},
+            verify=verify,
+        )
+        response.raise_for_status()
+    except requests.exceptions.SSLError as exc:
+        logger.exception('T-Bank Init SSL error')
+        raise TBankAPIError(
+            'SSL-ошибка при обращении к Т‑Банку. '
+            'Проверьте CA на сервере или временно TBANK_SSL_VERIFY=false.',
+            code='ssl_error',
+        ) from exc
+    except requests.exceptions.RequestException as exc:
+        logger.exception('T-Bank Init network error')
+        raise TBankAPIError(
+            'Нет связи с платёжным сервисом Т‑Банка. Попробуйте позже.',
+            code='network_error',
+        ) from exc
+
     data = response.json()
 
     if not data.get('Success'):
