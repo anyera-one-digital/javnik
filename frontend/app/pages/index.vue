@@ -29,6 +29,17 @@ const activeScreen = ref(0);
 const billing = ref<'month' | 'year'>('month');
 const { theme } = useYavnikTheme();
 
+useHead({
+  link: [
+    {
+      rel: 'preload',
+      as: 'video',
+      href: '/videos/showcase-profile.mp4',
+      type: 'video/mp4',
+    },
+  ],
+})
+
 const screens = computed(() => [
   {
     label: 'Профиль',

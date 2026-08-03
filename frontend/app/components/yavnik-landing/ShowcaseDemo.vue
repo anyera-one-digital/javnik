@@ -34,7 +34,7 @@ async function playPreview() {
   try {
     await el.play()
   } catch {
-    // Автоплей может быть заблокирован — оставляем постер
+    // Автоплей может быть заблокирован
   }
 }
 
@@ -42,18 +42,28 @@ function pausePreview() {
   previewRef.value?.pause()
 }
 
+function onVideoReady() {
+  void playPreview()
+}
+
 watch(
   () => [props.active, props.screen.video] as const,
   async ([active]) => {
     await nextTick()
-    if (active) await playPreview()
-    else pausePreview()
+    if (active) {
+      const el = previewRef.value
+      if (el && el.readyState >= 2) onVideoReady()
+      else void playPreview()
+    } else {
+      pausePreview()
+    }
   },
   { immediate: true }
 )
 
 onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  void playPreview()
 })
 
 onBeforeUnmount(() => {
@@ -76,13 +86,15 @@ onBeforeUnmount(() => {
               v-if="hasVideo"
               ref="previewRef"
               class="showcase-demo__video"
-              :poster="screen.image"
               :src="screen.video!"
               muted
+              autoplay
               playsinline
               loop
-              preload="metadata"
+              preload="auto"
               aria-label="Превью интерфейса"
+              @loadeddata="onVideoReady"
+              @canplay="onVideoReady"
             />
             <img
               v-else
