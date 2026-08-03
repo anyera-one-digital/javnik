@@ -9,6 +9,11 @@ import {
   type ShiftCycleId,
   type DayScheduleConfig
 } from '~/utils/workScheduleTemplates'
+import {
+  bookingLeadOptions,
+  normalizeBookingLead,
+  type BookingLeadId
+} from '~/utils/bookingLead'
 import { validateWorkBreaksNoOverlap } from '~/utils/validateWorkBreaks'
 
 const emit = defineEmits<{ saved: [] }>()
@@ -30,8 +35,10 @@ const breaks = ref<WorkBreak[]>([])
 const selectedWorkTemplate = ref<WorkScheduleTemplateId>('standard-5')
 const shiftCycle = ref<ShiftCycleId>('2-2')
 const shiftAnchorInput = ref(format(new Date(), 'yyyy-MM-dd'))
+const selectedBookingLead = ref<BookingLeadId>('same_day_1h')
 const templateInitialized = ref(false)
 const isSavingTemplate = ref(false)
+const isSavingBookingLead = ref(false)
 const isSyncingTemplate = ref(false)
 
 const templateSelectItems = workScheduleTemplateList.map(t => ({
@@ -39,8 +46,20 @@ const templateSelectItems = workScheduleTemplateList.map(t => ({
   value: t.id
 }))
 
+const bookingLeadSelectItems = bookingLeadOptions.map(o => ({
+  label: o.label,
+  value: o.value
+}))
+
+const bookingLeadHint = computed(() => {
+  return bookingLeadOptions.find(o => o.value === selectedBookingLead.value)?.hint ?? ''
+})
+
 const templateBlockHelp
   = 'Задаёт сегодняшний день и все будущие дни, пока для даты нет отдельной настройки ниже. Чтобы задать исключения, выберите дни в календаре и отредактируйте в форме настройки выбранных дней. Ручные настройки дня имеют приоритет над шаблоном.'
+
+const bookingLeadBlockHelp
+  = 'Ограничивает, насколько заранее клиент может записаться на вашей публичной странице. «За час» — в тот же день, но не ближе чем за час до начала. Остальные варианты открывают только дни начиная с выбранного горизонта.'
 
 function templateResolveOptions() {
   return {
@@ -564,6 +583,7 @@ function syncTemplateFieldsFromUser() {
   if (u.shift_anchor_date) {
     shiftAnchorInput.value = u.shift_anchor_date.slice(0, 10)
   }
+  selectedBookingLead.value = normalizeBookingLead(u.booking_lead)
 }
 
 let templateSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -593,6 +613,33 @@ async function onUserChangedWorkTemplate() {
       }
     } finally {
       isSavingTemplate.value = false
+    }
+  }, 400)
+}
+
+let bookingLeadSaveTimer: ReturnType<typeof setTimeout> | null = null
+async function onUserChangedBookingLead() {
+  if (isSyncingTemplate.value || !templateInitialized.value || !import.meta.client) {
+    return
+  }
+  if (bookingLeadSaveTimer) {
+    clearTimeout(bookingLeadSaveTimer)
+  }
+  bookingLeadSaveTimer = setTimeout(async () => {
+    isSavingBookingLead.value = true
+    try {
+      const r = await patchProfile({
+        booking_lead: selectedBookingLead.value
+      })
+      if (r.success) {
+        toast.add({
+          title: 'Сохранено',
+          description: 'Правило записи для клиентов обновлено.',
+          color: 'success'
+        })
+      }
+    } finally {
+      isSavingBookingLead.value = false
     }
   }, 400)
 }
@@ -859,6 +906,56 @@ onMounted(async () => {
           </div>
           <p
             v-if="isSavingTemplate"
+            class="text-xs text-muted"
+          >
+            Сохранение…
+          </p>
+        </div>
+
+        <div class="w-full min-w-0 max-w-full flex flex-col gap-3 sm:gap-4">
+          <div class="flex min-w-0 items-center gap-1.5">
+            <h3 class="min-w-0 text-lg font-semibold">
+              Запись возможна
+            </h3>
+            <UPopover
+              mode="click"
+              :ui="scheduleHelpPopoverUi"
+              :content="{ side: 'bottom', sideOffset: 6, collisionPadding: 12 }"
+            >
+              <UButton
+                type="button"
+                icon="i-lucide-circle-help"
+                color="neutral"
+                variant="ghost"
+                square
+                class="!size-7 shrink-0 rounded-full p-0 !text-muted"
+                aria-label="Справка: когда клиент может записаться"
+                aria-haspopup="dialog"
+              />
+              <template #content>
+                <p class="m-0 text-xs leading-relaxed text-highlighted sm:text-sm whitespace-normal break-words text-pretty">
+                  {{ bookingLeadBlockHelp }}
+                </p>
+              </template>
+            </UPopover>
+          </div>
+          <div class="w-full min-w-0 max-w-full sm:max-w-2xl">
+            <USelect
+              v-model="selectedBookingLead"
+              :items="bookingLeadSelectItems"
+              value-key="value"
+              :ui="compactSelectUi"
+              class="w-full min-w-0 max-w-full"
+              :disabled="isSavingBookingLead"
+              portal
+              @update:model-value="onUserChangedBookingLead"
+            />
+          </div>
+          <p class="text-xs text-muted">
+            {{ bookingLeadHint }}
+          </p>
+          <p
+            v-if="isSavingBookingLead"
             class="text-xs text-muted"
           >
             Сохранение…

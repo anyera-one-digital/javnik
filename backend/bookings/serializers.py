@@ -7,6 +7,8 @@ from .models import Customer, Service, ServiceImage, Event, Booking, WorkSchedul
 class CustomerSerializer(serializers.ModelSerializer):
     visits_count = serializers.SerializerMethodField()
     last_visit_date = serializers.SerializerMethodField()
+    next_booking_date = serializers.SerializerMethodField()
+    next_booking_time = serializers.SerializerMethodField()
 
     class Meta:
         model = Customer
@@ -28,6 +30,16 @@ class CustomerSerializer(serializers.ModelSerializer):
             .first()
         )
         return last.isoformat() if last else None
+
+    def get_next_booking_date(self, obj):
+        if hasattr(obj, 'next_booking_date') and obj.next_booking_date:
+            return obj.next_booking_date.isoformat()
+        return None
+
+    def get_next_booking_time(self, obj):
+        if hasattr(obj, 'next_booking_time') and obj.next_booking_time:
+            return obj.next_booking_time.strftime('%H:%M')
+        return None
 
 
 class ServiceImageSerializer(serializers.ModelSerializer):
@@ -88,7 +100,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = '__all__'
-        read_only_fields = ('user', 'created_at', 'updated_at', 'cover_image_url', 'portfolio_images', 'active')
+        read_only_fields = ('user', 'created_at', 'updated_at', 'cover_image_url', 'portfolio_images')
         # Исключаем cover_image из автоматической сериализации, используем только cover_image_url
         extra_kwargs = {
             'cover_image': {'write_only': True, 'required': False}
@@ -113,6 +125,8 @@ class ServiceSerializer(serializers.ModelSerializer):
                     'description': instance.description,
                     'duration': instance.duration,
                     'price': str(instance.price),
+                    'prepayment': str(getattr(instance, 'prepayment', 0)),
+                    'sort_order': getattr(instance, 'sort_order', 0),
                     'active': instance.active,
                     'cover_image': None,
                     'cover_image_url': None,

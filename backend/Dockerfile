@@ -11,6 +11,7 @@ RUN apt-get update && \
     libjpeg-dev \
     zlib1g-dev \
     libfreetype6-dev \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -33,10 +34,10 @@ COPY . .
 
 # Создание директорий для static и media
 RUN mkdir -p /app/staticfiles /app/media && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod +x /app/docker-entrypoint.sh
 
-# Переключение на пользователя без root-прав
-USER appuser
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Экспорт порта
 EXPOSE 8000

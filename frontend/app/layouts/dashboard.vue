@@ -6,11 +6,17 @@ import ScheduleSidebarCalendar from '~/components/UserPersonalAccount/schedule/S
 import SidebarProfile from '~/components/UserPersonalAccount/SidebarProfile.vue'
 
 const toast = useToast()
+const route = useRoute()
 
 const open = ref(false)
 
 const isDashboardMobile = useMediaQuery('(max-width: 767px)')
 const colorMode = useColorMode()
+
+/** Клиенты / Услуги — фиксированная высота без внешнего скролла */
+const isCatalogPage = computed(() =>
+  route.path === '/customers' || route.path === '/services' || route.path.startsWith('/customers/') || route.path.startsWith('/services/')
+)
 
 function toggleSidebarTheme() {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
@@ -70,7 +76,7 @@ const accountLinks = computed<NavigationMenuItem[][]>(() => [[{
 }, {
   label: 'Настройки',
   icon: 'i-lucide-settings',
-  to: '/settings',
+  to: '/settings/general',
   onSelect: () => { open.value = false }
 }]])
 
@@ -112,16 +118,16 @@ onMounted(async () => {
 <template>
   <UDashboardGroup
     unit="rem"
-    storage-key="dashboard-v4-compact"
+    storage-key="dashboard-v5-270"
     class="dashboard-page !items-stretch w-full min-h-0"
   >
     <UDashboardSidebar
       id="default"
       v-model:open="open"
       collapsible
-      :default-size="16"
-      :min-size="14"
-      :max-size="18"
+      :default-size="16.875"
+      :min-size="15.5"
+      :max-size="18.5"
       class="bg-elevated/25 h-full min-h-0 self-stretch"
       :ui="{ header: 'max-md:flex max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-3 max-md:border-b max-md:border-default' }"
     >
@@ -199,7 +205,10 @@ onMounted(async () => {
       </template>
     </UDashboardSidebar>
 
-    <div class="h-full min-h-0 min-w-0 flex-1 self-stretch overflow-auto md:pr-4">
+    <div
+      class="h-full min-h-0 min-w-0 flex-1 self-stretch md:pr-4"
+      :class="isCatalogPage ? 'overflow-hidden' : 'overflow-auto'"
+    >
       <slot />
     </div>
   </UDashboardGroup>

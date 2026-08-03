@@ -36,8 +36,7 @@ const screens = computed(() => [
     title: 'Страница, которая знакомит и записывает',
     image: '/images/specialist-page.png',
     alt: 'Публичная страница специалиста в Явьнике',
-    // Когда ролик готов: video: '/videos/showcase-profile.mp4'
-    video: null as string | null,
+    video: '/videos/showcase-profile.mp4' as string | null,
     caption: 'Клиент сразу видит услуги, отзывы и кнопку записи'
   },
   {
@@ -277,7 +276,7 @@ onBeforeUnmount(() => clearInterval(demoTimer));
             />
             <ToggleGroupRoot v-model="billing" class="billing-toggle" type="single" aria-label="Период оплаты">
               <ToggleGroupItem value="month">Месяц</ToggleGroupItem>
-              <ToggleGroupItem value="year">Год <small>−17%</small></ToggleGroupItem>
+              <ToggleGroupItem value="year">Год <small>−20%</small></ToggleGroupItem>
             </ToggleGroupRoot>
           </div>
           <div class="pricing-grid">
@@ -294,8 +293,12 @@ onBeforeUnmount(() => clearInterval(demoTimer));
             </article>
             <article class="price-card price-card--pro reveal">
               <div class="price-card__badge"><Sparkles :size="14" /> 1 месяц бесплатно</div>
-              <div class="price-card__head"><div><UiChip>Все возможности</UiChip><h3>Pro</h3></div><strong>{{ billing === 'month' ? '500 ₽' : '5 000 ₽' }}<small>/{{ billing === 'month' ? 'мес' : 'год' }}</small></strong></div>
-              <p>При регистрации — месяц Pro в подарок. Дальше 500 ₽/мес или остаётесь на Free.</p>
+              <div class="price-card__head"><div><UiChip>Все возможности</UiChip><h3>Pro</h3></div><strong>{{ billing === 'month' ? '500 ₽' : '4 800 ₽' }}<small>/{{ billing === 'month' ? 'мес' : 'год' }}</small></strong></div>
+              <p>
+                {{ billing === 'month'
+                  ? 'Первая оплата месяца — ещё +1 месяц. Дальше 500 ₽/мес.'
+                  : 'Год за 4 800 ₽ (−1 200 ₽). Первая оплата — ещё +3 месяца.' }}
+              </p>
               <ul>
                 <li><Check :size="16" /> До 1 500 клиентов</li>
                 <li><Check :size="16" /> До 150 записей в месяц</li>

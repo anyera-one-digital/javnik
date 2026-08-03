@@ -29,6 +29,10 @@ class Customer(models.Model):
         default='regular',
         verbose_name='Статус'
     )
+    status_manual = models.BooleanField(
+        default=False,
+        verbose_name='Статус задан вручную'
+    )
     notes = models.TextField(blank=True, null=True, verbose_name='Заметки')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
@@ -59,13 +63,20 @@ class Service(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена')
     cover_image = models.ImageField(upload_to='services/covers/', blank=True, null=True, verbose_name='Заглавное изображение')
     active = models.BooleanField(default=True, verbose_name='Активна')
+    sort_order = models.IntegerField(default=0, verbose_name='Порядок сортировки')
+    prepayment = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name='Предоплата',
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
 
     class Meta:
         verbose_name = 'Услуга'
         verbose_name_plural = 'Услуги'
-        ordering = ['-created_at']
+        ordering = ['sort_order', 'id']
 
     def __str__(self):
         return self.name

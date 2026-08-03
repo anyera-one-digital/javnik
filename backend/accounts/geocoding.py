@@ -40,7 +40,13 @@ def _suggest_yandex(query: str, limit: int) -> list[dict]:
         title = item.get('title', {}).get('text', '')
         addr = item.get('address', {})
         full_address = addr.get('formatted_address') or title if isinstance(addr, dict) else title
-        results.append({'address': full_address or title, 'title': title, 'uri': item.get('uri')})
+        results.append({
+            'address': full_address or title,
+            'title': title,
+            'uri': item.get('uri'),
+            'lat': None,
+            'lon': None,
+        })
     return results
 
 
@@ -68,15 +74,30 @@ def _suggest_dadata(query: str, limit: int) -> list[dict]:
     results = []
     for item in data.get('suggestions', [])[:limit]:
         value = item.get('value') or item.get('unrestricted_value', '')
-        if value:
-            results.append({'address': value, 'title': value, 'uri': None})
+        if not value:
+            continue
+        raw = item.get('data') or {}
+        lat = lon = None
+        try:
+            if raw.get('geo_lat') is not None and raw.get('geo_lon') is not None:
+                lat = float(raw['geo_lat'])
+                lon = float(raw['geo_lon'])
+        except (TypeError, ValueError):
+            lat = lon = None
+        results.append({
+            'address': value,
+            'title': value,
+            'uri': None,
+            'lat': lat,
+            'lon': lon,
+        })
     return results
 
 
 def suggest_addresses(query: str, limit: int = 7) -> list[dict]:
     """
     Получить подсказки адресов. Сначала Yandex, при отсутствии ключа — DaData.
-    Возвращает: [{"address": str, "title": str, "uri": str | None}, ...]
+    Возвращает: [{"address": str, "title": str, "uri": str | None, "lat": float | None, "lon": float | None}, ...]
     """
     if not query or len(query.strip()) < 2:
         return []
@@ -84,15 +105,41 @@ def suggest_addresses(query: str, limit: int = 7) -> list[dict]:
     results = _suggest_yandex(query, limit)
     if not results:
         results = _suggest_dadata(query, limit)
+    if not results:
+        logger.warning(
+            'Address suggest returned no results for %r (Yandex key=%s, DaData key=%s)',
+            query[:40],
+            bool(getattr(settings, 'YANDEX_MAPS_API_KEY', None)),
+            bool(getattr(settings, 'DADATA_API_KEY', None)),
+        )
     return results
 
 
 def geocode_address(address: str) -> Optional[dict]:
     """
-    Получить координаты через Yandex Geocoder API.
+    Получить координаты через Yandex Geocoder API, с fallback на DaData suggest.
     address: полный адрес или uri из Geosuggest.
     Возвращает {"lat": float, "lon": float, "address": str} или None.
     """
+    if not address:
+        return None
+
+    result = _geocode_yandex(address)
+    if result:
+        return result
+
+    # DaData: берём координаты из первой подсказки
+    for item in _suggest_dadata(address, 1):
+        if item.get('lat') is not None and item.get('lon') is not None:
+            return {
+                'lat': item['lat'],
+                'lon': item['lon'],
+                'address': item.get('address') or address,
+            }
+    return None
+
+
+def _geocode_yandex(address: str) -> Optional[dict]:
     api_key = getattr(settings, 'YANDEX_MAPS_API_KEY', None)
     if not api_key or not address:
         return None
@@ -123,7 +170,7 @@ def geocode_address(address: str) -> Optional[dict]:
             return None
         lon, lat = float(pos[0]), float(pos[1])
         meta = obj.get('metaDataProperty', {}).get('GeocoderMetaData', {})
-        address = meta.get('text', '')
-        return {'lat': lat, 'lon': lon, 'address': address}
+        text = meta.get('text', '')
+        return {'lat': lat, 'lon': lon, 'address': text}
     except (KeyError, ValueError, IndexError):
         return None

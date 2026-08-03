@@ -40,9 +40,19 @@ export interface User {
   updated_at?: string
   /** effective для дней без явной записи WorkSchedule; см. workScheduleTemplate */
   work_schedule_template?: string
+  /** Минимальный срок до записи для клиентов */
+  booking_lead?: string
   shift_cycle?: string
   shift_anchor_date?: string | null
   subscription?: UserSubscription
+}
+
+export interface UserSubscriptionOffers {
+  firstMonthBonusAvailable: boolean
+  firstYearBonusAvailable: boolean
+  monthPriceRub: number
+  yearPriceRub: number
+  yearDiscountRub: number
 }
 
 export interface UserSubscription {
@@ -56,6 +66,7 @@ export interface UserSubscription {
   isTrial: boolean
   grantedVia: 'trial' | 'admin' | 'payment' | null
   daysRemaining: number | null
+  offers?: UserSubscriptionOffers
   limits: {
     maxCustomers: number
     maxBookingsPerMonth: number
@@ -71,11 +82,25 @@ export interface Customer {
   phone?: string
   avatar?: string
   status?: 'regular' | 'loyal' | 'vip' | 'first-time'
+  /** If true, `status` overrides auto rules from visits_count */
+  status_manual?: boolean
   notes?: string
   visits_count?: number
   last_visit_date?: string | null
+  next_booking_date?: string | null
+  next_booking_time?: string | null
   created_at?: string
   updated_at?: string
+}
+
+export interface CustomerHistoryItem {
+  id: number
+  date: string
+  startTime: string
+  serviceName: string
+  price: number
+  status: string
+  isUpcoming: boolean
 }
 
 export interface Service {
@@ -85,6 +110,8 @@ export interface Service {
   description?: string
   duration: number
   price: number
+  prepayment?: number
+  sort_order?: number
   cover_image?: string
   cover_image_url?: string
   portfolio_images?: ServiceImage[]
@@ -238,4 +265,80 @@ export interface AnalyticsServiceBreakdownSection {
 export interface AnalyticsServicesBreakdownResponse {
   bookingsByService: AnalyticsServiceBreakdownSection
   revenueByService: AnalyticsServiceBreakdownSection
+}
+
+export interface AnalyticsDualRevenuePoint {
+  date: string
+  received: number
+  expected: number
+}
+
+export interface AnalyticsPeriodSummary {
+  averageCheck: number
+  cancellations: number
+  returningClients: number
+  bookingsCount: number
+  trendReady: boolean
+  trendHint: string | null
+}
+
+export interface AnalyticsClientsBreakdown {
+  total: number
+  new: number
+  returning: number
+  regular: number
+  items: AnalyticsBreakdownItem[]
+}
+
+export interface AnalyticsOverviewResponse {
+  revenue: AnalyticsMetric
+  bookings: AnalyticsMetric
+  newClients: AnalyticsMetric
+  completedBookings: AnalyticsMetric
+  successRate: number
+  periodSummary: AnalyticsPeriodSummary
+  clientsBreakdown: AnalyticsClientsBreakdown
+  revenueByService: AnalyticsServiceBreakdownSection
+  revenueChart: {
+    totalReceived: number
+    totalExpected: number
+    points: AnalyticsDualRevenuePoint[]
+  }
+  previousRange: { start: string, end: string }
+}
+
+export interface AnalyticsInsight {
+  icon: string
+  text: string
+}
+
+export interface AnalyticsLoadByDay {
+  day: string
+  weekday: number
+  loadPercent: number
+  availableMinutes: number
+  bookedMinutes: number
+}
+
+export interface AnalyticsPopularService {
+  name: string
+  bookings: number
+  revenue: number
+}
+
+export interface AnalyticsLoadResponse {
+  load: AnalyticsMetric
+  freeSlots: AnalyticsMetric
+  bookings: AnalyticsMetric
+  revenue: AnalyticsMetric
+  heatmap: {
+    hours: string[]
+    days: string[]
+    cells: number[][]
+    max: number
+  }
+  loadByDay: AnalyticsLoadByDay[]
+  insights: AnalyticsInsight[]
+  popularServices: AnalyticsPopularService[]
+  previousRange: { start: string, end: string }
 }

@@ -52,6 +52,7 @@ export default defineNuxtConfig({
     '/dashboard': { ssr: false },
     '/customers': { ssr: false },
     '/services': { ssr: false },
+    '/settings': { redirect: '/settings/general' },
     '/settings/**': { ssr: false },
     '/profile': { ssr: false },
     '/payment': { ssr: false },

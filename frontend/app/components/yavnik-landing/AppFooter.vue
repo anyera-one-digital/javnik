@@ -22,8 +22,11 @@
           <span>Информация</span>
           <a href="#faq">FAQ</a>
           <a href="mailto:hello@yavnik.ru">hello@yavnik.ru</a>
+          <NuxtLink to="/terms">
+            Пользовательское соглашение
+          </NuxtLink>
           <NuxtLink to="/privacy">
-            Политика
+            Политика конфиденциальности
           </NuxtLink>
         </div>
       </div>

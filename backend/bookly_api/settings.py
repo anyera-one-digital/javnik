@@ -162,11 +162,24 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@bookly.com')
 
 # Yandex Maps API (Geosuggest, Geocoder) — для подсказок адресов и отображения на карте
 # Получить ключ: https://developer.tech.yandex.com/
-YANDEX_MAPS_API_KEY = config('YANDEX_MAPS_API_KEY', default='')
+def _api_key(name: str, default: str = '') -> str:
+    """Like config(), but blank env values do not override a nonempty .env file entry."""
+    env_val = os.environ.get(name)
+    if env_val is not None and str(env_val).strip():
+        return str(env_val).strip()
+    had = name in os.environ
+    old = os.environ.pop(name, None)
+    try:
+        return str(config(name, default=default) or default).strip()
+    finally:
+        if had and old is not None:
+            os.environ[name] = old
 
+
+YANDEX_MAPS_API_KEY = _api_key('YANDEX_MAPS_API_KEY')
 # DaData API — fallback для подсказок адресов (если нет Yandex ключа)
 # Бесплатно ~10k запросов/день: https://dadata.ru/
-DADATA_API_KEY = config('DADATA_API_KEY', default='')
+DADATA_API_KEY = _api_key('DADATA_API_KEY')
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'

@@ -76,6 +76,12 @@ class User(AbstractUser):
         default='standard-5',
         verbose_name='Шаблон графика работы',
     )
+    booking_lead = models.CharField(
+        max_length=32,
+        default='same_day_1h',
+        verbose_name='Минимальный срок до записи',
+        help_text='Как рано клиент может записаться: за час, на следующий день и т.д.',
+    )
     shift_cycle = models.CharField(
         max_length=8,
         default='2-2',

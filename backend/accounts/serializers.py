@@ -5,6 +5,7 @@ from .models import User, Specialty
 from .phone_validation import validate_ru_phone
 from .subscription import build_subscription_payload, start_pro_trial
 from bookings.effective_schedule import ALLOWED_SHIFT_CYCLES, ALLOWED_TEMPLATE_IDS
+from .booking_lead import ALLOWED_BOOKING_LEADS, DEFAULT_BOOKING_LEAD
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -103,6 +104,7 @@ class UserSerializer(serializers.ModelSerializer):
     )
 
     work_schedule_template = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    booking_lead = serializers.CharField(required=False, allow_blank=True, max_length=32)
     shift_cycle = serializers.CharField(required=False, allow_blank=True, max_length=8)
     shift_anchor_date = serializers.DateField(required=False, allow_null=True)
     subscription = serializers.SerializerMethodField()
@@ -116,7 +118,7 @@ class UserSerializer(serializers.ModelSerializer):
             'service_address_lat', 'service_address_lon',
             'is_email_verified', 'show_public_schedule', 'show_public_reviews',
             'show_public_portfolio', 'created_at', 'updated_at',
-            'work_schedule_template', 'shift_cycle', 'shift_anchor_date',
+            'work_schedule_template', 'booking_lead', 'shift_cycle', 'shift_anchor_date',
             'subscription',
         )
         read_only_fields = (
@@ -150,6 +152,14 @@ class UserSerializer(serializers.ModelSerializer):
         v = str(value).strip()
         if v not in ALLOWED_TEMPLATE_IDS:
             raise serializers.ValidationError('Неизвестный шаблон графика.')
+        return v
+
+    def validate_booking_lead(self, value):
+        if not value or not str(value).strip():
+            return DEFAULT_BOOKING_LEAD
+        v = str(value).strip()
+        if v not in ALLOWED_BOOKING_LEADS:
+            raise serializers.ValidationError('Недопустимое значение срока записи.')
         return v
 
     def validate_shift_cycle(self, value):

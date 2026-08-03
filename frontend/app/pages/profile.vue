@@ -456,7 +456,11 @@ function openPublicProfilePreview() {
               description="Полный адрес, по которому вы оказываете услуги. Будет отображаться в публичном профиле."
               class="grid grid-cols-[1fr_1fr] max-sm:grid-cols-1 gap-4 items-start"
             >
-              <div ref="addressSuggestRef" class="w-full min-w-0 relative">
+              <div
+                ref="addressSuggestRef"
+                class="w-full min-w-0 relative"
+                @focusin="addressInputFocused = true"
+              >
                 <div class="flex gap-2">
                   <UInput
                     v-model="addressSearchQuery"
@@ -478,9 +482,12 @@ function openPublicProfilePreview() {
                 </div>
                 <div
                   v-if="addressSuggestOpen"
-                  class="absolute z-50 mt-1 w-full rounded-lg border border-default bg-background shadow-lg overflow-hidden"
+                  class="absolute z-50 mt-1 w-full rounded-lg border border-default bg-elevated shadow-lg overflow-hidden"
                 >
-                  <template v-if="addressSuggestions.length > 0">
+                  <div v-if="addressSuggestLoading" class="px-4 py-3 text-sm text-muted">
+                    Ищем адрес…
+                  </div>
+                  <template v-else-if="addressSuggestions.length > 0">
                     <button
                       v-for="(item, i) in addressSuggestions"
                       :key="i"
@@ -492,7 +499,7 @@ function openPublicProfilePreview() {
                       {{ item.address }}
                     </button>
                   </template>
-                  <div v-else-if="addressSearchQuery.trim().length >= 2 && !addressSuggestLoading" class="px-4 py-3 text-sm text-muted">
+                  <div v-else-if="addressSearchQuery.trim().length >= 2" class="px-4 py-3 text-sm text-muted">
                     Адрес не найден. Введите другой запрос.
                   </div>
                 </div>

@@ -4,6 +4,7 @@ import { ru } from 'date-fns/locale'
 import { formatWeekdayShort } from '~/utils'
 import { formatDurationMinutes } from '~/utils/formatDuration'
 import { isValidPhoneNumber, PHONE_ERROR_MESSAGE } from '~/utils/phone'
+import { isBookingSlotAllowed, normalizeBookingLead } from '~/utils/bookingLead'
 import type { User, Service, Booking, WorkSchedule, Review } from '~/types'
 import StarIcon from '~/components/UserPublicPage/StarIcon.vue'
 import PublicPageFooter from '~/components/UserPublicPage/PublicPageFooter.vue'
@@ -384,6 +385,8 @@ function getServiceModalAvailableSlots(date: Date, durationMinutes: number): str
   }
   if (cur < 24 * 60) free.push({ start: cur, end: 24 * 60 })
 
+  const lead = normalizeBookingLead(publicUser.value?.booking_lead)
+  const now = new Date()
   const step = 30
   const slots: string[] = []
   for (const f of free) {
@@ -391,7 +394,10 @@ function getServiceModalAvailableSlots(date: Date, durationMinutes: number): str
     while (s + durationMinutes <= f.end) {
       const h = Math.floor(s / 60)
       const m = s % 60
-      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+      const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      if (isBookingSlotAllowed(lead, date, time, now)) {
+        slots.push(time)
+      }
       s += step
     }
   }
@@ -422,7 +428,7 @@ const serviceModalAvailableTimeSlots = computed(() => {
   return getServiceModalAvailableSlots(d, svc.duration)
 })
 
-// По умолчанию выбираем завтрашний день (или первый доступный), чтобы активный день всегда был выбран
+// По умолчанию выбираем первый доступный день (с учётом горизонта записи)
 watch(
   () => ({
     open: serviceModalOpen.value,
@@ -433,9 +439,7 @@ watch(
   (state) => {
     if (!state.open || state.loading || !state.dates?.length) return
     if (state.current) return
-    const tomorrow = addDays(startOfDay(new Date()), 1)
-    const tomorrowInList = state.dates.find(d => isSameDay(d.dateObj, tomorrow))
-    selectedServiceDate.value = tomorrowInList ? tomorrowInList.dateObj : state.dates[0].dateObj
+    selectedServiceDate.value = state.dates[0].dateObj
     selectedServiceTime.value = null
   },
   { deep: true }
@@ -625,18 +629,6 @@ watch([publicUser, userError], ([user, error]) => {
 <template>
   <!-- Не рендерим профиль на странице календаря, календарь рендерится отдельно -->
   <div v-if="!isCalendarPage" class="min-h-screen bg-background relative flex flex-col">
-    <!-- Кнопка переключения темы -->
-    <div class="fixed top-4 right-4 z-50">
-      <UButton
-        :icon="colorMode.value === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon'"
-        color="neutral"
-        variant="ghost"
-        square
-        size="sm"
-        aria-label="Переключить тему"
-        @click="toggle"
-      />
-    </div>
     <div v-if="userPending || (!publicUser && !userError)" class="flex flex-1 items-center justify-center">
       <div class="text-center space-y-4">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-muted mx-auto"></div>
@@ -659,111 +651,131 @@ watch([publicUser, userError], ([user, error]) => {
         </div>
       </UPageCard>
     </div>
-    <div v-else-if="publicUser" class="flex-1 max-w-[1024px] w-full mx-auto px-4 pt-10 pb-8 md:pt-12">
-      <div class="mb-4">
-        <div class="flex flex-col items-start gap-8 md:flex-row md:items-center">
-          <!-- Аватар (большой круглый) -->
-          <UAvatar
-            :src="publicUser.avatar_url || null"
-            :alt="displayName"
-            class="shrink-0 w-[133px] h-[133px] min-w-[133px] min-h-[133px] md:w-[200px] md:h-[200px] md:min-w-[200px] md:min-h-[200px]"
-            size="2xl"
-          >
-            <template v-if="displayName" #fallback>
-              <span class="text-4xl md:text-[4rem]">
-                {{ displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) }}
-              </span>
-            </template>
-          </UAvatar>
 
-          <!-- Информация -->
-          <div class="flex-1 flex flex-col">
-            <!-- Имя и специальность -->
-            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
-              <h1 class="text-2xl font-bold">{{ displayName }}</h1>
-              <span v-if="specialty" class="text-base text-muted md:text-lg">{{ specialty }}</span>
-            </div>
-
-            <!-- Рейтинг и отзывы -->
-            <div v-if="showPublicReviews && reviewsStats.total > 0" class="flex items-center gap-2 mb-4">
-              <div class="flex items-center gap-0.5">
-                <StarIcon
-                  v-for="i in 5"
-                  :key="i"
-                  :filled="i <= Math.round(reviewsStats.average)"
-                  size="1.25rem"
-                  :class="[
-                    'transition-colors',
-                    i <= Math.round(reviewsStats.average) ? 'text-amber-500' : 'text-muted/50'
-                  ]"
-                />
-              </div>
-              <span class="font-semibold ml-1">{{ reviewsStats.average.toFixed(1) }}</span>
-              <button
-                type="button"
-                class="text-muted hover:text-foreground hover:underline cursor-pointer transition-colors"
-                @click="activeTab = 'reviews'"
-              >
-                ({{ reviewsStats.total }} {{ reviewsStats.total === 1 ? 'отзыв' : reviewsStats.total < 5 ? 'отзыва' : 'отзывов' }})
-              </button>
-            </div>
-
-            <!-- Кнопки действий -->
-            <div class="flex items-center gap-3 mb-4">
-              <UButton
-                color="neutral"
-                size="lg"
-                class="min-w-[9.5rem] justify-center !px-6 !bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
-                @click="openBookingModalForServiceSelection"
-              >
-                <Icon name="i-lucide-calendar-plus" class="w-5 h-5 mr-2" />
-                Записаться
-              </UButton>
-              <UButton
-                v-if="publicUser.show_public_schedule !== false"
-                color="neutral"
-                size="lg"
-                variant="outline"
-                class="min-w-[9.5rem] justify-center !px-6"
-                :to="calendarUrl"
-              >
-                <Icon name="i-lucide-calendar" class="w-5 h-5 mr-2" />
-                Расписание
-              </UButton>
-            </div>
-            
-            <!-- Описание -->
-            <p v-if="publicUser.bio" class="text-base text-muted mb-4 leading-relaxed max-w-2xl">
-              {{ publicUser.bio }}
-            </p>
-            <p v-else-if="publicUser.first_name" class="text-base text-muted mb-4 leading-relaxed max-w-2xl">
-              Профессиональный специалист с опытом работы. Помогу создать идеальный результат для любого случая!
-            </p>
-            
-            <!-- Адрес -->
-            <div v-if="fullPublicAddress" class="text-base text-foreground max-w-2xl flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span class="font-semibold">Адрес:</span>
-              <span class="font-normal">{{ fullPublicAddress }}</span>
-              <a
-                v-if="publicUser.service_address_lat != null && publicUser.service_address_lon != null"
-                :href="`https://yandex.ru/maps/?pt=${publicUser.service_address_lon},${publicUser.service_address_lat}&z=16&l=map`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-default hover:bg-elevated transition-colors"
-              >
-                <Icon name="i-lucide-map-pin" class="w-3.5 h-3.5" />
-                Смотреть на карте
-              </a>
-            </div>
-          </div>
-        </div>
+    <UContainer
+      v-else-if="publicUser"
+      :ui="{ base: 'w-full max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8' }"
+      class="sm:border-x border-default flex-1 flex flex-col pt-4 pb-8 md:pt-6"
+    >
+      <div class="flex justify-end mb-4 md:mb-6">
+        <UButton
+          :icon="colorMode.value === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon'"
+          color="neutral"
+          variant="ghost"
+          square
+          size="sm"
+          aria-label="Переключить тему"
+          @click="toggle"
+        />
       </div>
 
-      <!-- Вкладки (в стиле Threads) — скрываем, если остались только услуги -->
-      <div class="pt-1.5">
+      <!-- Hero: фото сверху по центру, контент под ним -->
+      <header class="flex flex-col items-center text-center mb-10 md:mb-12">
+        <UAvatar
+          :src="publicUser.avatar_url || null"
+          :alt="displayName"
+          class="shrink-0 size-28 md:size-36 ring ring-default ring-offset-3 ring-offset-bg mb-6"
+          size="3xl"
+        >
+          <template v-if="displayName" #fallback>
+            <span class="text-3xl md:text-4xl font-semibold">
+              {{ displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) }}
+            </span>
+          </template>
+        </UAvatar>
+
+        <div class="mb-3 space-y-1">
+          <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-highlighted">
+            {{ displayName }}
+          </h1>
+          <p v-if="specialty" class="text-base md:text-lg text-muted">
+            {{ specialty }}
+          </p>
+        </div>
+
+        <div v-if="showPublicReviews && reviewsStats.total > 0" class="flex items-center justify-center gap-2 mb-5">
+          <div class="flex items-center gap-0.5">
+            <StarIcon
+              v-for="i in 5"
+              :key="i"
+              :filled="i <= Math.round(reviewsStats.average)"
+              size="1.25rem"
+              :class="[
+                'transition-colors',
+                i <= Math.round(reviewsStats.average) ? 'text-amber-500' : 'text-muted/50'
+              ]"
+            />
+          </div>
+          <span class="font-semibold ml-1">{{ reviewsStats.average.toFixed(1) }}</span>
+          <button
+            type="button"
+            class="text-muted hover:text-foreground hover:underline cursor-pointer transition-colors"
+            @click="activeTab = 'reviews'"
+          >
+            ({{ reviewsStats.total }} {{ reviewsStats.total === 1 ? 'отзыв' : reviewsStats.total < 5 ? 'отзыва' : 'отзывов' }})
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
+          <UButton
+            color="neutral"
+            size="lg"
+            class="min-w-[9.5rem] justify-center !px-6 !bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
+            @click="openBookingModalForServiceSelection"
+          >
+            <Icon name="i-lucide-calendar-plus" class="w-5 h-5 mr-2" />
+            Записаться
+          </UButton>
+          <UButton
+            v-if="publicUser.show_public_schedule !== false"
+            color="neutral"
+            size="lg"
+            variant="outline"
+            class="min-w-[9.5rem] justify-center !px-6"
+            :to="calendarUrl"
+          >
+            <Icon name="i-lucide-calendar" class="w-5 h-5 mr-2" />
+            Расписание
+          </UButton>
+        </div>
+
+        <p
+          v-if="publicUser.bio"
+          class="text-base text-muted leading-relaxed max-w-2xl mx-auto mb-4"
+        >
+          {{ publicUser.bio }}
+        </p>
+        <p
+          v-else-if="publicUser.first_name"
+          class="text-base text-muted leading-relaxed max-w-2xl mx-auto mb-4"
+        >
+          Профессиональный специалист с опытом работы. Помогу создать идеальный результат для любого случая!
+        </p>
+
+        <div
+          v-if="fullPublicAddress"
+          class="text-base text-foreground max-w-2xl mx-auto flex flex-wrap items-center justify-center gap-x-2 gap-y-1"
+        >
+          <span class="font-semibold">Адрес:</span>
+          <span class="font-normal">{{ fullPublicAddress }}</span>
+          <a
+            v-if="publicUser.service_address_lat != null && publicUser.service_address_lon != null"
+            :href="`https://yandex.ru/maps/?pt=${publicUser.service_address_lon},${publicUser.service_address_lat}&z=16&l=map`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-default hover:bg-elevated transition-colors"
+          >
+            <Icon name="i-lucide-map-pin" class="w-3.5 h-3.5" />
+            Смотреть на карте
+          </a>
+        </div>
+      </header>
+
+      <!-- Вкладки и контент -->
+      <div class="pt-1.5 flex-1">
         <nav
           v-if="showPublicTabsMenu"
-          class="flex items-center gap-1 mb-6 border-b border-default"
+          class="flex items-center justify-center gap-1 mb-6 border-b border-default"
         >
           <button
             type="button"
@@ -773,7 +785,7 @@ watch([publicUser, userError], ([user, error]) => {
           >
             Услуги
             <span
-              class="absolute bottom-0 left-0 right-0 h-[3px] rounded-full transition-opacity bg-foreground dark:bg-white z-[1]"
+              class="absolute bottom-0 left-0 right-0 h-[3px] rounded-full transition-opacity bg-gray-900 dark:bg-white z-[1]"
               :class="activeTab === 'services' ? 'opacity-100' : 'opacity-0'"
             />
           </button>
@@ -786,7 +798,7 @@ watch([publicUser, userError], ([user, error]) => {
           >
             Портфолио
             <span
-              class="absolute bottom-0 left-0 right-0 h-[3px] rounded-full transition-opacity bg-foreground dark:bg-white z-[1]"
+              class="absolute bottom-0 left-0 right-0 h-[3px] rounded-full transition-opacity bg-gray-900 dark:bg-white z-[1]"
               :class="activeTab === 'portfolio' ? 'opacity-100' : 'opacity-0'"
             />
           </button>
@@ -799,7 +811,7 @@ watch([publicUser, userError], ([user, error]) => {
           >
             Отзывы
             <span
-              class="absolute bottom-0 left-0 right-0 h-[3px] rounded-full transition-opacity bg-foreground dark:bg-white z-[1]"
+              class="absolute bottom-0 left-0 right-0 h-[3px] rounded-full transition-opacity bg-gray-900 dark:bg-white z-[1]"
               :class="activeTab === 'reviews' ? 'opacity-100' : 'opacity-0'"
             />
           </button>
@@ -1030,9 +1042,9 @@ watch([publicUser, userError], ([user, error]) => {
           </div>
         </div>
       </div>
-    </div>
 
-    <PublicPageFooter />
+      <PublicPageFooter />
+    </UContainer>
   </div>
 
   <!-- Модальное окно услуги (вне основного контейнера) -->

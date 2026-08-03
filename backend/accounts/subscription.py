@@ -30,14 +30,25 @@ TRIAL_DAYS = 30  # первый месяц Pro бесплатно при рег�
 
 # Суммы в копейках (должны совпадать с app/pages/payment.vue)
 SUBSCRIPTION_PRICE_KOPECKS = {
-    'month': 50000,
-    'year': 480000,
+    'month': 50000,   # 500 ₽
+    'year': 480000,   # 4800 ₽ (= 500×12 − 1200 скидка)
 }
 
 SUBSCRIPTION_PERIOD_DAYS = {
     'month': 30,
     'year': 365,
 }
+
+# Бонусные дни только при первой оплате соответствующего периода
+FIRST_PAYMENT_BONUS_DAYS = {
+    'month': 30,  # первая оплата месяца → 2 месяца вместо 1
+    'year': 90,   # первая оплата года → 15 месяцев вместо 12
+}
+
+YEAR_DISCOUNT_RUB = 1200
+MONTH_PRICE_RUB = 500
+YEAR_PRICE_RUB = 4800
+
 
 LIMITS = {
     PLAN_FREE: {
@@ -81,13 +92,60 @@ def days_remaining(user) -> int | None:
     return max(0, (expires - today).days)
 
 
+def has_confirmed_subscription_payment(user, billing_period: str | None = None) -> bool:
+    """Была ли хотя бы одна успешная оплата Pro (опционально — конкретного периода)."""
+    from .models import SubscriptionPayment
+
+    qs = SubscriptionPayment.objects.filter(
+        user=user,
+        status=SubscriptionPayment.STATUS_CONFIRMED,
+    )
+    if billing_period:
+        qs = qs.filter(billing_period=billing_period)
+    return qs.exists()
+
+
+def is_first_subscription_payment(user, billing_period: str) -> bool:
+    """
+    Первая успешная оплата данного периода.
+    Вызывать после того, как текущий платёж уже помечен confirmed:
+    count == 1 означает, что это как раз первая оплата.
+    """
+    from .models import SubscriptionPayment
+
+    count = SubscriptionPayment.objects.filter(
+        user=user,
+        billing_period=billing_period,
+        status=SubscriptionPayment.STATUS_CONFIRMED,
+    ).count()
+    return count <= 1
+
+
+def paid_period_days(billing_period: str, *, is_first: bool) -> int:
+    """Срок Pro в днях с учётом бонуса первой оплаты."""
+    if billing_period not in SUBSCRIPTION_PERIOD_DAYS:
+        raise ValueError(f'Unknown billing period: {billing_period}')
+    days = SUBSCRIPTION_PERIOD_DAYS[billing_period]
+    if is_first:
+        days += FIRST_PAYMENT_BONUS_DAYS.get(billing_period, 0)
+    return days
+
+
 def activate_pro_from_payment(user, billing_period: str, *, save: bool = True) -> None:
-    """Продлевает или активирует Pro после успешной оплаты."""
+    """
+    Продлевает или активирует Pro после успешной оплаты.
+
+    Первая оплата месяца: +1 бонусный месяц (итого 60 дней).
+    Первая оплата года: +3 бонусных месяца (итого 365+90 дней).
+    Повторные оплаты: только оплаченный период (30 / 365 дней).
+    Если Pro ещё активен (в т.ч. пробный) — дни добавляются к текущему сроку.
+    """
     if billing_period not in SUBSCRIPTION_PERIOD_DAYS:
         raise ValueError(f'Unknown billing period: {billing_period}')
 
     now = timezone.now()
-    delta = timedelta(days=SUBSCRIPTION_PERIOD_DAYS[billing_period])
+    is_first = is_first_subscription_payment(user, billing_period)
+    delta = timedelta(days=paid_period_days(billing_period, is_first=is_first))
 
     if user.subscription_expires_at and user.subscription_expires_at > now:
         expires = user.subscription_expires_at + delta
@@ -164,6 +222,14 @@ def build_subscription_payload(user) -> dict:
         'isTrial': is_trial,
         'grantedVia': user.subscription_granted_via or None,
         'daysRemaining': remaining,
+        'offers': {
+            # ещё не было успешной оплаты месяца / года → покажем бонусы в UI
+            'firstMonthBonusAvailable': not has_confirmed_subscription_payment(user, 'month'),
+            'firstYearBonusAvailable': not has_confirmed_subscription_payment(user, 'year'),
+            'monthPriceRub': MONTH_PRICE_RUB,
+            'yearPriceRub': YEAR_PRICE_RUB,
+            'yearDiscountRub': YEAR_DISCOUNT_RUB,
+        },
         'limits': {
             'maxCustomers': limits['max_customers'],
             'maxBookingsPerMonth': limits['max_bookings_per_month'],

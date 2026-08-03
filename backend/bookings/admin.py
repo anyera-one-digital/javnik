@@ -4,8 +4,8 @@ from .models import Customer, Service, ServiceImage, Event, Booking, WorkSchedul
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'phone', 'status', 'user', 'created_at')
-    list_filter = ('status', 'created_at')
+    list_display = ('name', 'email', 'phone', 'status', 'status_manual', 'user', 'created_at')
+    list_filter = ('status', 'status_manual', 'created_at')
     search_fields = ('name', 'email', 'phone')
     readonly_fields = ('created_at', 'updated_at')
 

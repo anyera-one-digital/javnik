@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
 import type { Service } from '~/types'
-import { h, resolveComponent } from 'vue'
 import ServicesServiceModal from '~/components/UserPersonalAccount/services/ServiceModal.vue'
-import { formatDurationMinutes } from '~/utils/formatDuration'
 import ServicesDeleteServiceModal from '~/components/UserPersonalAccount/services/DeleteServiceModal.vue'
+import ServiceCatalogList from '~/components/UserPersonalAccount/services/ServiceCatalogList.vue'
+import type { ServiceFilter } from '~/components/UserPersonalAccount/services/ServiceCatalogList.vue'
+import ServiceEditorPanel from '~/components/UserPersonalAccount/services/ServiceEditorPanel.vue'
 
 definePageMeta({
   layout: 'dashboard',
@@ -15,148 +15,203 @@ useSeoMeta({
   title: 'Услуги'
 })
 
-const UBadge = resolveComponent('UBadge')
-const UButton = resolveComponent('UButton')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
-const USwitch = resolveComponent('USwitch')
-
 const toast = useToast()
-const { accessToken } = useAuth()
+const { getAuthHeaders, refreshAccessToken } = useAuth()
 
-const togglingServiceIds = ref<Set<number>>(new Set())
-
-// Используем $fetch для запросов с токеном авторизации
 const services = ref<Service[]>([])
-
-function extractApiErrorMessage(errorData: unknown, fallback: string): string {
-  if (!errorData) return fallback
-  if (typeof errorData === 'string') return errorData
-  if (typeof errorData !== 'object') return fallback
-  const data = errorData as Record<string, unknown>
-  if (data.detail) return String(data.detail)
-  if (data.message) return String(data.message)
-  if (data.error) return String(data.error)
-  const fields = Object.keys(data).map((key) => {
-    const value = data[key]
-    return `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`
-  })
-  return fields.join('\n') || fallback
-}
-
-async function loadServices() {
-  if (!accessToken.value) return
-
-  try {
-    let token = accessToken.value.replace(/^Bearer\s+/i, '')
-    token = `Bearer ${token}`
-
-    const response = await $fetch<any>('/api/services/', {
-      headers: { Authorization: token }
-    })
-
-    if (Array.isArray(response)) {
-      services.value = response
-    } else if (response && typeof response === 'object' && 'results' in response) {
-      services.value = response.results || []
-    } else {
-      services.value = []
-    }
-  } catch (error: any) {
-    const statusCode = error.statusCode || error.status || 500
-    const errorData = error.data || error.response?.data
-    console.error('Error loading services:', statusCode, errorData)
-
-    if (statusCode === 401) {
-      toast.add({
-        title: 'Ошибка авторизации',
-        description: 'Токен авторизации истек или недействителен. Пожалуйста, войдите в систему заново.',
-        color: 'error'
-      })
-      await navigateTo('/login')
-    } else if (statusCode === 400) {
-      toast.add({
-        title: 'Ошибка запроса',
-        description: extractApiErrorMessage(errorData, error.message || 'Неверный формат запроса'),
-        color: 'error',
-        timeout: 15000
-      })
-    } else {
-      toast.add({
-        title: 'Ошибка загрузки',
-        description: error.message || 'Не удалось загрузить услуги',
-        color: 'error'
-      })
-    }
-    services.value = []
-  }
-}
-
-onMounted(async () => {
-  if (process.client && !accessToken.value) {
-    const storedToken = localStorage.getItem('auth.accessToken')
-    if (storedToken) {
-      accessToken.value = storedToken
-    }
-  }
-
-  if (accessToken.value) {
-    await loadServices()
-  }
-})
-
-watch(accessToken, async (token) => {
-  if (token) {
-    await loadServices()
-  }
-})
-
-async function refreshServices() {
-  await loadServices()
-}
-
-const editingService = ref<Service | null>(null)
-const editServiceModalOpen = ref(false)
+const isLoading = ref(false)
+const filter = ref<ServiceFilter>('all')
+const selectedId = ref<number | null>(null)
+const saving = ref(false)
 const createServiceModalOpen = ref(false)
 const deletingService = ref<Service | null>(null)
 
-async function confirmDeleteService() {
-  if (!deletingService.value) return
-  
-  const service = deletingService.value
-  
+const selectedService = computed(
+  () => services.value.find(s => s.id === selectedId.value) ?? null
+)
+
+function sortServices(list: Service[]) {
+  return [...list].sort((a, b) => {
+    const ao = a.sort_order ?? 0
+    const bo = b.sort_order ?? 0
+    if (ao !== bo) return ao - bo
+    return a.id - b.id
+  })
+}
+
+async function loadServices() {
+  if (!process.client) return
+
   try {
-    if (!accessToken.value) {
-      toast.add({
-        title: 'Ошибка',
-        description: 'Необходима авторизация',
-        color: 'error'
-      })
-      deletingService.value = null
+    isLoading.value = true
+    let headers = getAuthHeaders()
+    if (!headers.Authorization) {
+      services.value = []
       return
     }
 
-    const token = accessToken.value.startsWith('Bearer ')
-      ? accessToken.value
-      : `Bearer ${accessToken.value}`
+    try {
+      const data = await $fetch<any>('/api/services/', { headers })
+      const list = Array.isArray(data)
+        ? data
+        : (data?.results && Array.isArray(data.results) ? data.results : [])
+      services.value = sortServices(list as Service[])
+    } catch (error: any) {
+      if (error.statusCode === 401 || error.status === 401) {
+        const refreshed = await refreshAccessToken()
+        if (refreshed) {
+          headers = getAuthHeaders()
+          const retry = await $fetch<any>('/api/services/', { headers })
+          const list = Array.isArray(retry)
+            ? retry
+            : (retry?.results && Array.isArray(retry.results) ? retry.results : [])
+          services.value = sortServices(list as Service[])
+          return
+        }
+      }
+      console.error('Error loading services:', error)
+      services.value = []
+    }
+  } finally {
+    isLoading.value = false
+    if (selectedId.value && !services.value.some(s => s.id === selectedId.value)) {
+      selectedId.value = null
+    }
+  }
+}
 
+onMounted(() => {
+  if (process.client) loadServices()
+})
+
+function selectService(s: Service) {
+  selectedId.value = s.id
+}
+
+async function saveService(payload: {
+  data: Partial<Service>
+  portfolioFiles: File[]
+  removedPortfolioImageIds: number[]
+}) {
+  if (!selectedService.value) return
+  const id = selectedService.value.id
+  const headers = getAuthHeaders()
+  if (!headers.Authorization) {
+    toast.add({ title: 'Ошибка', description: 'Необходима авторизация', color: 'error' })
+    return
+  }
+
+  saving.value = true
+  try {
+    const needsMultipart
+      = payload.portfolioFiles.length > 0
+      || payload.removedPortfolioImageIds.length > 0
+
+    let updated: Service
+    if (needsMultipart) {
+      const formData = new FormData()
+      const d = payload.data
+      if (d.name != null) formData.append('name', String(d.name))
+      if (d.description != null) formData.append('description', String(d.description))
+      if (d.duration != null) formData.append('duration', String(d.duration))
+      if (d.price != null) formData.append('price', String(d.price))
+      if (d.prepayment != null) formData.append('prepayment', String(d.prepayment))
+      if (d.active != null) formData.append('active', d.active ? 'true' : 'false')
+      payload.portfolioFiles.forEach((file) => {
+        formData.append('portfolio_images', file)
+      })
+      if (payload.removedPortfolioImageIds.length) {
+        formData.append(
+          'removed_portfolio_image_ids',
+          JSON.stringify(payload.removedPortfolioImageIds)
+        )
+      }
+      updated = await $fetch<Service>(`/api/services/${id}/`, {
+        method: 'PATCH',
+        headers: { Authorization: headers.Authorization as string },
+        body: formData
+      })
+    } else {
+      updated = await $fetch<Service>(`/api/services/${id}/`, {
+        method: 'PATCH',
+        headers,
+        body: payload.data
+      })
+    }
+
+    const idx = services.value.findIndex(s => s.id === id)
+    if (idx !== -1) {
+      services.value[idx] = { ...services.value[idx], ...updated, ...payload.data }
+    }
+    // Reload to refresh portfolio_images URLs
+    if (needsMultipart) await loadServices()
+    toast.add({ title: 'Сохранено', description: 'Услуга обновлена', color: 'success' })
+  } catch (error: any) {
+    toast.add({
+      title: 'Ошибка',
+      description: error.data?.detail || error.data?.error || error.message || 'Не удалось сохранить',
+      color: 'error'
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+async function reorderServices(ids: number[]) {
+  const prev = services.value
+  const byId = new Map(prev.map(s => [s.id, s]))
+  services.value = ids
+    .map((id, index) => {
+      const s = byId.get(id)
+      return s ? { ...s, sort_order: index } : null
+    })
+    .filter(Boolean) as Service[]
+
+  const headers = getAuthHeaders()
+  if (!headers.Authorization) {
+    services.value = prev
+    return
+  }
+
+  try {
+    await $fetch('/api/services/reorder', {
+      method: 'POST',
+      headers,
+      body: { ids }
+    })
+  } catch (error: any) {
+    services.value = prev
+    toast.add({
+      title: 'Ошибка',
+      description: error.data?.detail || error.message || 'Не удалось изменить порядок',
+      color: 'error'
+    })
+  }
+}
+
+async function confirmDeleteService() {
+  if (!deletingService.value) return
+  const service = deletingService.value
+  const headers = getAuthHeaders()
+  if (!headers.Authorization) {
+    toast.add({ title: 'Ошибка', description: 'Необходима авторизация', color: 'error' })
+    deletingService.value = null
+    return
+  }
+
+  try {
     await $fetch(`/api/services/${service.id}/`, {
       method: 'DELETE',
-      headers: {
-        Authorization: token
-      }
+      headers
     })
-
     toast.add({
       title: 'Услуга удалена',
-      description: `Услуга "${service.name}" была удалена`,
+      description: `Услуга «${service.name}» была удалена`,
       color: 'success'
     })
-
-    // Обновляем список услуг
-    await refreshServices()
-    
-    // Закрываем модальное окно
+    if (selectedId.value === service.id) selectedId.value = null
     deletingService.value = null
+    await loadServices()
   } catch (error: any) {
     toast.add({
       title: 'Ошибка',
@@ -166,167 +221,25 @@ async function confirmDeleteService() {
   }
 }
 
-function deleteService(service: Service) {
-  deletingService.value = service
+function openDelete(s: Service) {
+  deletingService.value = s
 }
 
-function authHeader() {
-  if (!accessToken.value) return null
-  const token = accessToken.value.replace(/^Bearer\s+/i, '')
-  return `Bearer ${token}`
+async function handleCreated() {
+  createServiceModalOpen.value = false
+  await loadServices()
 }
-
-async function toggleServiceActive(service: Service, active: boolean) {
-  if (togglingServiceIds.value.has(service.id)) return
-
-  const previous = service.active !== false
-  const nextIds = new Set(togglingServiceIds.value)
-  nextIds.add(service.id)
-  togglingServiceIds.value = nextIds
-
-  const index = services.value.findIndex(item => item.id === service.id)
-  if (index !== -1) {
-    services.value[index] = { ...services.value[index], active }
-  }
-
-  const authorization = authHeader()
-  if (!authorization) {
-    if (index !== -1) {
-      services.value[index] = { ...services.value[index], active: previous }
-    }
-    togglingServiceIds.value = new Set([...togglingServiceIds.value].filter(id => id !== service.id))
-    return
-  }
-
-  try {
-    await $fetch(`/api/services/${service.id}`, {
-      method: 'PATCH',
-      headers: { Authorization: authorization },
-      body: { active }
-    })
-    toast.add({
-      title: active ? 'Услуга включена' : 'Услуга отключена',
-      description: active
-        ? `«${service.name}» снова доступна для записи`
-        : `«${service.name}» скрыта из записи до повторного включения`,
-      color: 'success'
-    })
-  } catch (error: any) {
-    if (index !== -1) {
-      services.value[index] = { ...services.value[index], active: previous }
-    }
-    toast.add({
-      title: 'Ошибка',
-      description: error.data?.detail || error.data?.error || error.message || 'Не удалось изменить статус услуги',
-      color: 'error'
-    })
-  } finally {
-    togglingServiceIds.value = new Set([...togglingServiceIds.value].filter(id => id !== service.id))
-  }
-}
-
-function getRowItems(service: Service) {
-  return [
-    {
-      type: 'label',
-      label: 'Действия'
-    },
-    {
-      label: 'Редактировать',
-      icon: 'i-lucide-edit',
-      onSelect: () => {
-        editingService.value = service
-        editServiceModalOpen.value = true
-      }
-    },
-    {
-      type: 'separator'
-    },
-    {
-      label: 'Удалить',
-      icon: 'i-lucide-trash',
-      color: 'error' as const,
-      onSelect: () => {
-        deleteService(service)
-      }
-    }
-  ]
-}
-
-const columns = computed<TableColumn<Service>[]>(() => [
-  {
-    accessorKey: 'name',
-    header: 'Название',
-    cell: ({ row }) => {
-      return h('p', { class: 'font-medium text-highlighted' }, row.original.name)
-    }
-  },
-  {
-    accessorKey: 'duration',
-    header: 'Длительность',
-    cell: ({ row }) => {
-      return formatDurationMinutes(row.original.duration)
-    }
-  },
-  {
-    accessorKey: 'price',
-    header: 'Цена',
-    cell: ({ row }) => {
-      const price = row.original.price
-      return price
-        ? h('span', { class: 'font-medium' }, `${Math.round(price).toLocaleString('ru-RU')} ₽`)
-        : '-'
-    }
-  },
-  {
-    accessorKey: 'active',
-    header: () => h('span', { class: 'whitespace-nowrap font-medium' }, 'Онлайн-запись'),
-    cell: ({ row }) => {
-      const service = row.original
-      const isActive = service.active !== false
-      const isToggling = togglingServiceIds.value.has(service.id)
-
-      return h('div', { class: 'flex items-center gap-2.5' }, [
-        h(USwitch, {
-          modelValue: isActive,
-          color: 'neutral',
-          disabled: isToggling,
-          'onUpdate:modelValue': (value: boolean) => toggleServiceActive(service, value)
-        }),
-        h('span', { class: 'text-sm text-muted whitespace-nowrap min-w-[2.25rem]' }, isActive ? 'Вкл' : 'Выкл')
-      ])
-    }
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => {
-      return h(
-        'div',
-        { class: 'text-right' },
-        h(
-          UDropdownMenu,
-          {
-            content: {
-              align: 'end'
-            },
-            items: getRowItems(row.original)
-          },
-          () =>
-            h(UButton, {
-              icon: 'i-lucide-ellipsis-vertical',
-              color: 'neutral',
-              variant: 'ghost',
-              class: 'ml-auto'
-            })
-        )
-      )
-    }
-  }
-])
 </script>
 
 <template>
-  <UDashboardPanel id="services">
+  <UDashboardPanel
+    id="services"
+    class="catalog-dashboard-panel h-full min-h-0"
+    :ui="{
+      root: 'h-full min-h-0 max-h-full !min-h-0 overflow-hidden',
+      body: 'flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto flex flex-col gap-3 p-4 sm:p-6'
+    }"
+  >
     <template #header>
       <UDashboardNavbar title="Услуги">
         <template #leading>
@@ -334,49 +247,83 @@ const columns = computed<TableColumn<Service>[]>(() => [
         </template>
 
         <template #right>
-          <UButton 
-            label="Добавить услугу" 
-            icon="i-lucide-plus" 
-            color="neutral"
-            variant="solid"
-            class="!bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
+          <UButton
+            label="Добавить услугу"
+            icon="i-lucide-plus"
+            class="!bg-violet-500 !text-white hover:!bg-violet-400"
             @click="createServiceModalOpen = true"
-          />
-          <ServicesServiceModal
-            v-model="editServiceModalOpen"
-            :service="editingService || undefined"
-            @saved="() => { refreshServices(); editingService = null; editServiceModalOpen = false }"
-          />
-          <ServicesDeleteServiceModal
-            :service="deletingService"
-            @confirmed="confirmDeleteService"
-            @cancelled="deletingService = null"
           />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
-      <UTable
-        :data="services"
-        :columns="columns"
-        class="shrink-0"
-        :ui="{
-          base: 'table-fixed border-separate border-spacing-0',
-          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-          tbody: '[&>tr]:last:[&>td]:border-b-0',
-          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-          td: 'border-b border-default',
-          separator: 'h-0'
-        }"
-      />
+      <div class="catalog-page h-full min-h-0 overflow-hidden flex flex-col gap-3">
+        <div
+          v-if="isLoading && !services.length"
+          class="flex-1 flex items-center justify-center text-muted text-sm"
+        >
+          Загрузка услуг...
+        </div>
+
+        <div
+          v-else
+          class="flex-1 min-h-0 overflow-hidden grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,400px)] gap-3"
+        >
+          <ServiceCatalogList
+            v-model:filter="filter"
+            :services="services"
+            :selected-id="selectedId"
+            class="min-h-[40vh] xl:min-h-0 h-full overflow-hidden"
+            @select="selectService"
+            @reorder="reorderServices"
+          />
+
+          <ServiceEditorPanel
+            class="hidden xl:flex h-full min-h-0 overflow-hidden"
+            :service="selectedService"
+            :saving="saving"
+            @save="saveService"
+            @remove="selectedService && openDelete(selectedService)"
+          />
+
+          <div
+            v-if="selectedService"
+            class="xl:hidden fixed inset-0 z-40 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            @click.self="selectedId = null"
+          >
+            <div class="relative w-full sm:max-w-md h-[85vh] sm:h-[80vh] sm:rounded-[14px] overflow-hidden">
+              <UButton
+                icon="i-lucide-x"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="absolute top-3 right-12 z-10"
+                aria-label="Закрыть"
+                @click="selectedId = null"
+              />
+              <ServiceEditorPanel
+                class="h-full"
+                :service="selectedService"
+                :saving="saving"
+                @save="saveService"
+                @remove="openDelete(selectedService)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
   </UDashboardPanel>
 
-  <!-- Модал создания новой услуги -->
   <ServicesServiceModal
     v-model="createServiceModalOpen"
-    @saved="() => { refreshServices(); createServiceModalOpen = false }"
+    @saved="handleCreated"
+  />
+
+  <ServicesDeleteServiceModal
+    :service="deletingService"
+    @confirmed="confirmDeleteService"
+    @cancelled="deletingService = null"
   />
 </template>
-

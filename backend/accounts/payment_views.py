@@ -88,7 +88,7 @@ def subscription_payment_init_view(request):
     order_id = uuid.uuid4().hex
 
     period_label = 'месяц' if billing_period == 'month' else 'год'
-    description = f'Bookly Pro — подписка на {period_label}'
+    description = f'Явьник Pro — подписка на {period_label}'
 
     payment = SubscriptionPayment.objects.create(
         user=user,

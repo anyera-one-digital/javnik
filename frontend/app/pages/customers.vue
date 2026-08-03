@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
-import { getPaginationRowModel } from '@tanstack/table-core'
-import type { Row } from '@tanstack/table-core'
-import { format, parseISO } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import type { Customer } from '~/types'
-import { h, resolveComponent } from 'vue'
+import type { Customer, CustomerHistoryItem } from '~/types'
 import CustomersAddModal from '~/components/UserPersonalAccount/customers/AddModal.vue'
 import CustomersDeleteCustomerModal from '~/components/UserPersonalAccount/customers/DeleteCustomerModal.vue'
+import CustomerList from '~/components/UserPersonalAccount/customers/CustomerList.vue'
+import type { CustomerListFilter } from '~/components/UserPersonalAccount/customers/CustomerList.vue'
+import CustomerDetailPanel from '~/components/UserPersonalAccount/customers/CustomerDetailPanel.vue'
 
 definePageMeta({
   layout: 'dashboard',
@@ -18,84 +15,101 @@ useSeoMeta({
   title: 'Клиенты'
 })
 
-const UButton = resolveComponent('UButton')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
-
 const toast = useToast()
-const table = useTemplateRef('table')
-
-const columnVisibility = ref()
+const { getAuthHeaders, refreshAccessToken } = useAuth()
 
 const createCustomerModalOpen = ref(false)
-const editCustomerModalOpen = ref(false)
-const editingCustomer = ref<Customer | null>(null)
 const deletingCustomer = ref<Customer | null>(null)
 const customers = ref<Customer[]>([])
 const isLoading = ref(false)
-const { getAuthHeaders, refreshAccessToken } = useAuth()
+const saving = ref(false)
+
+const search = ref('')
+const listFilter = ref<CustomerListFilter>('all')
+const selectedId = ref<number | null>(null)
+const history = ref<CustomerHistoryItem[]>([])
+const loadingHistory = ref(false)
+
+const selectedCustomer = computed(
+  () => customers.value.find(c => c.id === selectedId.value) ?? null
+)
 
 async function loadCustomers() {
   if (!process.client) return
-  
+
   try {
     isLoading.value = true
     let headers = getAuthHeaders()
-    
+
     if (!headers.Authorization) {
       customers.value = []
       return
     }
 
     try {
-      const data = await $fetch<any>('/api/customers/', {
-        headers
-      })
-
-      // Убеждаемся, что data - это массив
+      const data = await $fetch<any>('/api/customers/', { headers })
       if (Array.isArray(data)) {
         customers.value = data as Customer[]
       } else if (data && typeof data === 'object' && 'results' in data) {
-        // Если это пагинированный ответ
         customers.value = Array.isArray(data.results) ? (data.results as Customer[]) : []
       } else {
         customers.value = []
       }
     } catch (error: any) {
-      // Если получили 401, пытаемся обновить токен
       if (error.statusCode === 401 || error.status === 401) {
         const refreshed = await refreshAccessToken()
-
         if (refreshed) {
           headers = getAuthHeaders()
-
-          try {
-            const retryData = await $fetch<any>('/api/customers/', {
-              headers
-            })
-            
-            if (Array.isArray(retryData)) {
-              customers.value = retryData as Customer[]
-            } else if (retryData && typeof retryData === 'object' && 'results' in retryData) {
-              customers.value = Array.isArray(retryData.results) ? (retryData.results as Customer[]) : []
-            } else {
-              customers.value = []
-            }
-            return
-          } catch (retryError) {
-            console.error('Retry customers after refresh failed:', retryError)
+          const retryData = await $fetch<any>('/api/customers/', { headers })
+          if (Array.isArray(retryData)) {
+            customers.value = retryData as Customer[]
+          } else if (retryData?.results) {
+            customers.value = retryData.results as Customer[]
+          } else {
+            customers.value = []
           }
+          return
         }
       }
-      
       console.error('Error loading customers:', error)
       customers.value = []
     }
-  } catch (error: any) {
-    console.error('Unexpected error loading customers:', error)
-    customers.value = []
   } finally {
     isLoading.value = false
+    if (selectedId.value && !customers.value.some(c => c.id === selectedId.value)) {
+      selectedId.value = null
+      history.value = []
+    }
   }
+}
+
+async function loadHistory(customerId: number) {
+  loadingHistory.value = true
+  history.value = []
+  try {
+    const headers = getAuthHeaders()
+    if (!headers.Authorization) return
+    const res = await $fetch<{ items: CustomerHistoryItem[] }>(
+      `/api/customers/${customerId}/history/`,
+      { headers }
+    )
+    history.value = Array.isArray(res?.items) ? res.items : []
+  } catch (e: any) {
+    console.error('Failed to load customer history', e)
+    history.value = []
+    toast.add({
+      title: 'Не удалось загрузить историю',
+      description: e?.data?.detail || e?.message || 'Попробуйте обновить страницу',
+      color: 'error'
+    })
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+function selectCustomer(c: Customer) {
+  selectedId.value = c.id
+  loadHistory(c.id)
 }
 
 async function handleCustomerSaved() {
@@ -103,11 +117,8 @@ async function handleCustomerSaved() {
   createCustomerModalOpen.value = false
 }
 
-// Загружаем клиентов при монтировании
 onMounted(() => {
-  if (process.client) {
-    loadCustomers()
-  }
+  if (process.client) loadCustomers()
 })
 
 async function confirmDeleteCustomer(customer: Customer) {
@@ -122,7 +133,7 @@ async function confirmDeleteCustomer(customer: Customer) {
 
     await $fetch(`/api/customers/${customer.id}/`, {
       method: 'DELETE',
-      headers: getAuthHeaders()
+      headers
     })
 
     toast.add({
@@ -131,6 +142,10 @@ async function confirmDeleteCustomer(customer: Customer) {
       color: 'success'
     })
 
+    if (selectedId.value === customer.id) {
+      selectedId.value = null
+      history.value = []
+    }
     await loadCustomers()
     deletingCustomer.value = null
   } catch (error: any) {
@@ -142,118 +157,60 @@ async function confirmDeleteCustomer(customer: Customer) {
   }
 }
 
-function deleteCustomer(customer: Customer) {
-  deletingCustomer.value = customer
+function openDelete(c: Customer) {
+  deletingCustomer.value = c
 }
 
-function formatLastVisit(dateStr: string | null | undefined) {
-  if (!dateStr) return '—'
+async function saveCustomer(payload: Partial<Customer>) {
+  if (!selectedCustomer.value) return
+  const id = selectedCustomer.value.id
+  const headers = getAuthHeaders()
+  if (!headers.Authorization) {
+    toast.add({ title: 'Ошибка', description: 'Необходима авторизация', color: 'error' })
+    return
+  }
+  if (!payload.email?.trim()) {
+    toast.add({ title: 'Ошибка', description: 'Укажите email клиента', color: 'error' })
+    return
+  }
+  if (!payload.name || payload.name.trim().length < 2) {
+    toast.add({ title: 'Ошибка', description: 'Укажите имя клиента', color: 'error' })
+    return
+  }
+
+  saving.value = true
   try {
-    return format(parseISO(dateStr), 'd MMMM yyyy', { locale: ru })
-  } catch {
-    return '—'
+    const updated = await $fetch<Customer>(`/api/customers/${id}/`, {
+      method: 'PATCH',
+      headers,
+      body: payload
+    })
+    const idx = customers.value.findIndex(c => c.id === id)
+    if (idx !== -1) {
+      customers.value[idx] = { ...customers.value[idx], ...updated, ...payload }
+    }
+    toast.add({ title: 'Сохранено', description: 'Данные клиента обновлены', color: 'success' })
+  } catch (error: any) {
+    toast.add({
+      title: 'Ошибка',
+      description: error.data?.detail || error.data?.error || error.data?.email?.[0] || error.data?.message || error.message || 'Не удалось сохранить',
+      color: 'error'
+    })
+  } finally {
+    saving.value = false
   }
 }
-
-function getRowItems(row: Row<Customer>) {
-  return [
-    {
-      type: 'label',
-      label: 'Действия'
-    },
-    {
-      label: 'Редактировать',
-      icon: 'i-lucide-edit',
-      onSelect() {
-        editingCustomer.value = row.original
-        editCustomerModalOpen.value = true
-      }
-    },
-    {
-      type: 'separator'
-    },
-    {
-      label: 'Удалить',
-      icon: 'i-lucide-trash',
-      color: 'error' as const,
-      onSelect() {
-        deleteCustomer(row.original)
-      }
-    }
-  ]
-}
-
-const columns: TableColumn<Customer>[] = [
-  {
-    accessorKey: 'name',
-    header: 'Имя',
-    cell: ({ row }) => h('p', { class: 'font-medium text-highlighted' }, row.original.name)
-  },
-  {
-    accessorKey: 'email',
-    header: 'Электронная почта',
-    cell: ({ row }) => row.original.email || '-'
-  },
-  {
-    accessorKey: 'phone',
-    header: 'Телефон',
-    cell: ({ row }) => row.original.phone || '-'
-  },
-  {
-    accessorKey: 'visits_count',
-    header: () => h('span', { class: 'whitespace-nowrap' }, 'Визиты'),
-    cell: ({ row }) => h('span', { class: 'whitespace-nowrap tabular-nums' }, String(row.original.visits_count ?? 0))
-  },
-  {
-    accessorKey: 'last_visit_date',
-    header: () => h('span', { class: 'whitespace-nowrap' }, 'Последний визит'),
-    cell: ({ row }) => h(
-      'span',
-      { class: 'whitespace-nowrap' },
-      formatLastVisit(row.original.last_visit_date)
-    ),
-    meta: {
-      class: {
-        th: 'min-w-[10.5rem]',
-        td: 'min-w-[10.5rem]'
-      }
-    }
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => {
-      return h(
-        'div',
-        { class: 'text-right' },
-        h(
-          UDropdownMenu,
-          {
-            content: {
-              align: 'end'
-            },
-            items: getRowItems(row)
-          },
-          () =>
-            h(UButton, {
-              icon: 'i-lucide-ellipsis-vertical',
-              color: 'neutral',
-              variant: 'ghost',
-              class: 'ml-auto'
-            })
-        )
-      )
-    }
-  }
-]
-
-const pagination = ref({
-  pageIndex: 0,
-  pageSize: 10
-})
 </script>
 
 <template>
-  <UDashboardPanel id="customers">
+  <UDashboardPanel
+    id="customers"
+    class="catalog-dashboard-panel h-full min-h-0"
+    :ui="{
+      root: 'h-full min-h-0 max-h-full !min-h-0 overflow-hidden',
+      body: 'flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto flex flex-col gap-3 p-4 sm:p-6'
+    }"
+  >
     <template #header>
       <UDashboardNavbar title="Клиенты">
         <template #leading>
@@ -261,12 +218,10 @@ const pagination = ref({
         </template>
 
         <template #right>
-          <UButton 
-            label="Добавить клиента" 
-            icon="i-lucide-plus" 
-            color="neutral"
-            variant="solid"
-            class="!bg-gray-900 !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
+          <UButton
+            label="Добавить клиента"
+            icon="i-lucide-plus"
+            class="!bg-violet-500 !text-white hover:!bg-violet-400"
             @click="createCustomerModalOpen = true"
           />
         </template>
@@ -274,71 +229,80 @@ const pagination = ref({
     </template>
 
     <template #body>
-      <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-        <UTable
-          ref="table"
-          v-model:column-visibility="columnVisibility"
-          v-model:pagination="pagination"
-          :pagination-options="{
-            getPaginationRowModel: getPaginationRowModel()
-          }"
-          class="customers-table shrink-0 min-w-[44rem]"
-          :data="customers"
-          :columns="columns"
-          :loading="isLoading"
-          :ui="{
-            base: 'border-separate border-spacing-0',
-            thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-            tbody: '[&>tr]:last:[&>td]:border-b-0',
-            th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r whitespace-nowrap',
-            td: 'border-b border-default',
-            separator: 'h-0'
-          }"
-        />
-      </div>
-
-      <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-        <div class="text-sm text-muted">
-          Всего {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} клиентов
+      <div class="catalog-page h-full min-h-0 overflow-hidden flex flex-col gap-3">
+        <div
+          v-if="isLoading && !customers.length"
+          class="flex-1 flex items-center justify-center text-muted text-sm"
+        >
+          Загрузка клиентов...
         </div>
 
-        <div class="flex items-center gap-1.5">
-          <UPagination
-            :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-            :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-            :total="table?.tableApi?.getFilteredRowModel().rows.length"
-            active-color="neutral"
-            @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
+        <div
+          v-else
+          class="flex-1 min-h-0 overflow-hidden grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] gap-3"
+        >
+          <CustomerList
+            v-model:search="search"
+            v-model:filter="listFilter"
+            :customers="customers"
+            :selected-id="selectedId"
+            class="min-h-[40vh] xl:min-h-0 h-full overflow-hidden"
+            @select="selectCustomer"
           />
+
+          <!-- Desktop panel: высота экрана, кнопки внизу карточки -->
+          <CustomerDetailPanel
+            class="hidden xl:flex h-full min-h-0 overflow-hidden"
+            :customer="selectedCustomer"
+            :history="history"
+            :loading-history="loadingHistory"
+            :saving="saving"
+            @save="saveCustomer"
+            @remove="selectedCustomer && openDelete(selectedCustomer)"
+            @book="navigateTo('/schedule')"
+          />
+
+          <!-- Mobile overlay panel -->
+          <div
+            v-if="selectedCustomer"
+            class="xl:hidden fixed inset-0 z-40 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            @click.self="selectedId = null"
+          >
+            <div class="relative w-full sm:max-w-md h-[85vh] sm:h-[80vh] sm:rounded-[14px] overflow-hidden">
+              <UButton
+                icon="i-lucide-x"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="absolute top-3 left-3 z-10"
+                aria-label="Закрыть"
+                @click="selectedId = null"
+              />
+              <CustomerDetailPanel
+                class="h-full"
+                :customer="selectedCustomer"
+                :history="history"
+                :loading-history="loadingHistory"
+                :saving="saving"
+                @save="saveCustomer"
+                @remove="openDelete(selectedCustomer)"
+                @book="navigateTo('/schedule')"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </template>
   </UDashboardPanel>
 
-  <!-- Модал создания нового клиента -->
   <CustomersAddModal
     v-model="createCustomerModalOpen"
     @saved="handleCustomerSaved"
   />
 
-  <!-- Модал редактирования клиента -->
-  <CustomersAddModal
-    v-model="editCustomerModalOpen"
-    :customer="editingCustomer"
-    @saved="() => { loadCustomers(); editingCustomer = null; editCustomerModalOpen = false }"
-  />
-
-  <!-- Модал удаления клиента -->
   <CustomersDeleteCustomerModal
     :customer="deletingCustomer"
     @confirmed="deletingCustomer && confirmDeleteCustomer(deletingCustomer)"
     @cancelled="deletingCustomer = null"
   />
 </template>
-
-<style scoped>
-.customers-table :deep(thead th:nth-child(5)),
-.customers-table :deep(tbody td:nth-child(5)) {
-  min-width: 10.5rem;
-}
-</style>

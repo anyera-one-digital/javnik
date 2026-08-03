@@ -2,6 +2,8 @@ interface AddressSuggestion {
   address: string
   title: string
   uri?: string
+  lat?: number | null
+  lon?: number | null
 }
 
 export const useAddressSuggest = () => {
@@ -13,30 +15,48 @@ export const useAddressSuggest = () => {
   const suppressNextSearch = ref(false)
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let requestId = 0
 
   const fetchSuggestions = async (query: string) => {
     if (suppressNextSearch.value) {
       suppressNextSearch.value = false
       return
     }
-    if (!query || query.trim().length < 2) {
+    const q = query.trim()
+    if (q.length < 2) {
       suggestions.value = []
       isOpen.value = false
       return
     }
+
+    const headers = getAuthHeaders()
+    if (!headers.Authorization) {
+      suggestions.value = []
+      isOpen.value = false
+      return
+    }
+
+    const currentRequest = ++requestId
     loading.value = true
+    isOpen.value = true
     try {
-      const data = await $fetch<{ results: AddressSuggestion[] }>('/api/address-suggest', {
-        params: { q: query.trim() },
-        headers: getAuthHeaders() as HeadersInit
+      // Nginx проксирует /api/* на Django — вызываем бэкенд напрямую.
+      const data = await $fetch<{ results: AddressSuggestion[] }>('/api/auth/address-suggest/', {
+        params: { q },
+        headers: headers as HeadersInit
       })
-      suggestions.value = data.results || []
-      isOpen.value = query.trim().length >= 2
+      if (currentRequest !== requestId) return
+      suggestions.value = Array.isArray(data?.results) ? data.results : []
+      isOpen.value = true
     } catch (err) {
+      if (currentRequest !== requestId) return
       console.error('Address suggest error:', err)
       suggestions.value = []
+      isOpen.value = true
     } finally {
-      loading.value = false
+      if (currentRequest === requestId) {
+        loading.value = false
+      }
     }
   }
 

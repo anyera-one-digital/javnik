@@ -47,7 +47,7 @@ const links = [[{
 
     <template #body>
       <div class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full mx-auto lg:max-w-5xl">
-        <NuxtPage />
+        <NuxtPage :page-key="r => r.fullPath" />
       </div>
     </template>
   </UDashboardPanel>

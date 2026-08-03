@@ -94,6 +94,35 @@ a[class*="ui-button"] {
   border-radius: 9999px !important;
 }
 
+/* Квадратные/круглые icon-only кнопки (удаление фото, корзина и т.п.) */
+button.icon-btn-round,
+a.icon-btn-round {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  min-width: 2.25rem !important;
+  min-height: 2.25rem !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  aspect-ratio: 1 / 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+button.icon-btn-round-sm,
+a.icon-btn-round-sm {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  min-width: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  aspect-ratio: 1 / 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 /* Стили для полной заливки звезд (акцент lime-600) */
 [class*="text-primary"] svg,
 [class*="text-primary"] svg path,
@@ -515,4 +544,67 @@ button[class*="primary"],
 .dashboard-sidebar-content [class*="ui-navigation-menu"] svg {
   width: 0.583rem !important;  /* ~9px, было 14px — уменьшено на треть */
   height: 0.583rem !important;
+}
+
+/* Master–detail catalog pages (Клиенты / Услуги) */
+.catalog-page {
+  --catalog-panel-bg: color-mix(in oklab, white 3.5%, var(--ui-bg));
+  --catalog-panel-border: color-mix(in oklab, white 5.5%, transparent);
+}
+
+.catalog-page .catalog-panel {
+  border: 1px solid var(--catalog-panel-border);
+  background: var(--catalog-panel-bg);
+}
+
+:root:not(.dark) .catalog-page {
+  --catalog-panel-bg: color-mix(in oklab, var(--ui-bg-elevated) 45%, var(--ui-bg));
+  --catalog-panel-border: color-mix(in oklab, var(--ui-border) 55%, transparent);
+}
+
+/* Каталог: панель на всю высоту слота, без min-h-svh и без внешнего скролла */
+.catalog-dashboard-panel {
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.catalog-dashboard-panel > [data-slot="body"] {
+  overflow: hidden !important;
+  min-height: 0 !important;
+}
+
+/* Строки каталога: без скругления (глобальный radius кнопок не должен влиять) */
+.catalog-list-row {
+  border-radius: 0 !important;
+}
+
+/* Пагинация каталога: компактные квадратные кнопки */
+.dashboard-page .catalog-pagination button,
+.dashboard-page .catalog-pagination a[role="button"],
+.dashboard-page .catalog-pagination a.inline-flex {
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Активная страница пагинации — violet */
+.dashboard-page button.catalog-pagination-active,
+.dashboard-page a.catalog-pagination-active {
+  background-color: #8b5cf6 !important;
+  color: #fff !important;
+  border-color: #8b5cf6 !important;
+}
+
+.dashboard-page button.catalog-pagination-active:hover,
+.dashboard-page a.catalog-pagination-active:hover {
+  background-color: #a78bfa !important;
+  color: #fff !important;
 }

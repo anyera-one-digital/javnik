@@ -9,6 +9,8 @@ from .views import (
     analytics_stats_view,
     analytics_revenue_view,
     analytics_services_breakdown_view,
+    analytics_overview_view,
+    analytics_load_view,
 )
 
 router = DefaultRouter()
@@ -27,4 +29,6 @@ urlpatterns = [
         analytics_services_breakdown_view,
         name='analytics_services_breakdown',
     ),
+    path('analytics/overview/', analytics_overview_view, name='analytics_overview'),
+    path('analytics/load/', analytics_load_view, name='analytics_load'),
 ]

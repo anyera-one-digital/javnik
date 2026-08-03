@@ -3,8 +3,9 @@ import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { VisXYContainer, VisLine, VisAxis, VisArea, VisCrosshair, VisTooltip } from '@unovis/vue'
 import type { Period, Range, AnalyticsRevenueMode, AnalyticsRevenueResponse } from '~/types'
-import { segmentControlTabsUi } from '~/utils/segmentControlTabs'
 import { placeholderRevenuePoints } from '~/utils/analyticsPlaceholders'
+
+const ACCENT = '#8b5cf6'
 
 const props = defineProps<{
   period: Period
@@ -110,39 +111,44 @@ const xTicks = (i: number) => {
 }
 
 const template = (d: DataRecord) => `${formatDate(d.date)}: ${formatNumber(d.amount)}`
+
+const chartTabsUi = {
+  list: 'relative flex w-full h-9 min-h-9 p-0.5 gap-0.5 box-border rounded-full analytics-track',
+  indicator: 'rounded-full bg-violet-500/20',
+  trigger:
+    'flex min-w-0 flex-1 self-stretch items-center justify-center text-xs font-medium data-[state=inactive]:text-muted data-[state=active]:text-violet-400'
+}
 </script>
 
 <template>
-  <UCard ref="cardRef" :ui="{ root: 'overflow-visible', body: '!px-0 !pt-0 !pb-3' }">
-    <template #header>
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0">
-          <p class="text-xs text-muted uppercase mb-1.5">
-            {{ chartTitle }}
-          </p>
-          <p class="text-3xl text-highlighted font-semibold">
-            <template v-if="loading">—</template>
-            <template v-else>{{ formatNumber(total) }}</template>
-          </p>
-        </div>
-
-        <UTabs
-          v-model="revenueMode"
-          :items="[
-            { label: 'Реальный', value: 'actual' },
-            { label: 'Потенциальный', value: 'potential' }
-          ]"
-          size="md"
-          color="neutral"
-          variant="pill"
-          :content="false"
-          class="w-full shrink-0 sm:w-[280px]"
-          :ui="segmentControlTabsUi"
-        />
+  <div ref="cardRef" class="analytics-card p-4 sm:p-5 min-w-0 overflow-hidden">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4">
+      <div class="min-w-0">
+        <p class="text-base font-semibold text-highlighted mb-1">
+          {{ chartTitle }}
+        </p>
+        <p class="text-2xl sm:text-3xl font-semibold text-highlighted tracking-tight">
+          <template v-if="loading">—</template>
+          <template v-else>{{ formatNumber(total) }}</template>
+        </p>
       </div>
-    </template>
 
-    <div v-if="loading" class="h-96 w-full flex items-center justify-center text-muted">
+      <UTabs
+        v-model="revenueMode"
+        :items="[
+          { label: 'Реальный', value: 'actual' },
+          { label: 'Потенциальный', value: 'potential' }
+        ]"
+        size="sm"
+        color="neutral"
+        variant="pill"
+        :content="false"
+        class="w-full shrink-0 sm:w-[260px]"
+        :ui="chartTabsUi"
+      />
+    </div>
+
+    <div v-if="loading" class="h-96 w-full flex items-center justify-center text-muted text-sm">
       Загрузка графика...
     </div>
 
@@ -150,19 +156,19 @@ const template = (d: DataRecord) => `${formatDate(d.date)}: ${formatNumber(d.amo
       v-else-if="data.length > 0"
       :data="data"
       :padding="{ top: 40 }"
-      class="h-96"
+      class="h-96 analytics-unovis"
       :width="width"
     >
       <VisLine
         :x="x"
         :y="y"
-        color="var(--ui-chart-line)"
+        :color="ACCENT"
       />
       <VisArea
         :x="x"
         :y="y"
-        color="var(--ui-chart-line)"
-        :opacity="0.15"
+        :color="ACCENT"
+        :opacity="0.18"
       />
 
       <VisAxis
@@ -172,7 +178,7 @@ const template = (d: DataRecord) => `${formatDate(d.date)}: ${formatNumber(d.amo
       />
 
       <VisCrosshair
-        color="var(--ui-chart-line)"
+        :color="ACCENT"
         :template="template"
       />
 
@@ -182,21 +188,22 @@ const template = (d: DataRecord) => `${formatDate(d.date)}: ${formatNumber(d.amo
     <div v-else class="h-96 w-full flex items-center justify-center text-muted text-sm text-center px-4">
       {{ emptyHint }}
     </div>
-  </UCard>
+  </div>
 </template>
 
 <style scoped>
-.unovis-xy-container {
-  --ui-chart-line: var(--ui-text-highlighted);
-  --vis-crosshair-line-stroke-color: var(--ui-chart-line);
+.analytics-unovis :deep(.unovis-xy-container),
+:deep(.unovis-xy-container) {
+  --ui-chart-line: #8b5cf6;
+  --vis-crosshair-line-stroke-color: #8b5cf6;
   --vis-crosshair-circle-stroke-color: var(--ui-bg);
 
-  --vis-axis-grid-color: var(--ui-border);
-  --vis-axis-tick-color: var(--ui-border);
+  --vis-axis-grid-color: color-mix(in oklab, var(--ui-border) 55%, transparent);
+  --vis-axis-tick-color: transparent;
   --vis-axis-tick-label-color: var(--ui-text-dimmed);
 
-  --vis-tooltip-background-color: var(--ui-bg);
-  --vis-tooltip-border-color: var(--ui-border);
+  --vis-tooltip-background-color: var(--analytics-card-bg, var(--ui-bg));
+  --vis-tooltip-border-color: var(--analytics-card-border, var(--ui-border));
   --vis-tooltip-text-color: var(--ui-text-highlighted);
 }
 </style>

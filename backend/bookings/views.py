@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 from rest_framework import viewsets, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
@@ -12,7 +12,12 @@ from accounts.subscription import (
     check_service_limit,
     require_pro_subscription,
 )
-from django.db.models import Count, Q, Max
+from accounts.booking_lead import (
+    booking_lead_error_message,
+    is_booking_datetime_allowed,
+    normalize_booking_lead,
+)
+from django.db.models import Count, Q, Max, OuterRef, Subquery
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -27,6 +32,8 @@ from .analytics import (
     completed_bookings_metric,
     revenue_chart,
     services_breakdown,
+    analytics_overview,
+    load_analytics,
 )
 from .serializers import (
     CustomerSerializer,
@@ -56,15 +63,53 @@ class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        today = dt_date.today()
         completed_bookings = Q(bookings__status='completed')
+        upcoming = Booking.objects.filter(
+            customer_id=OuterRef('pk'),
+            status__in=['pending', 'confirmed'],
+            date__gte=today,
+        ).order_by('date', 'start_time')
+
         return Customer.objects.filter(user=self.request.user).annotate(
             visits_count=Count('bookings', filter=completed_bookings),
             last_visit_date=Max('bookings__date', filter=completed_bookings),
+            next_booking_date=Subquery(upcoming.values('date')[:1]),
+            next_booking_time=Subquery(upcoming.values('start_time')[:1]),
         )
 
     def perform_create(self, serializer):
         check_customer_limit(self.request.user)
         serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['get'])
+    def history(self, request, pk=None):
+        """История визитов: последние completed + ближайшие upcoming."""
+        customer = self.get_object()
+        today = dt_date.today()
+        base = Booking.objects.filter(user=request.user, customer=customer).select_related('service')
+
+        # Completed отдельно — иначе будущие pending/confirmed вытесняют визиты из лимита
+        completed = list(
+            base.filter(status='completed').order_by('-date', '-start_time')[:25]
+        )
+        upcoming = list(
+            base.filter(status__in=['pending', 'confirmed'], date__gte=today)
+            .order_by('date', 'start_time')[:10]
+        )
+
+        items = []
+        for b in upcoming + completed:
+            items.append({
+                'id': b.id,
+                'date': b.date.isoformat(),
+                'startTime': b.start_time.strftime('%H:%M'),
+                'serviceName': b.service.name if b.service_id else 'Без услуги',
+                'price': float(b.service.price) if b.service_id and b.service else 0,
+                'status': b.status,
+                'isUpcoming': b.status in ('pending', 'confirmed') and b.date >= today,
+            })
+        return Response({'items': items})
 
 
 class ServiceViewSet(viewsets.ModelViewSet):
@@ -77,7 +122,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Фильтруем только услуги текущего пользователя
-        return Service.objects.filter(user=self.request.user).prefetch_related('portfolio_images').select_related('user')
+        return (
+            Service.objects.filter(user=self.request.user)
+            .prefetch_related('portfolio_images')
+            .select_related('user')
+            .order_by('sort_order', 'id')
+        )
     
     def get_serializer_context(self):
         """
@@ -89,7 +139,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         check_service_limit(self.request.user)
-        service = serializer.save(user=self.request.user, active=True)
+        max_order = (
+            Service.objects.filter(user=self.request.user)
+            .aggregate(m=models.Max('sort_order'))['m']
+        )
+        next_order = (max_order if max_order is not None else -1) + 1
+        service = serializer.save(user=self.request.user, active=True, sort_order=next_order)
         
         # Обрабатываем изображения портфолио
         portfolio_images = self.request.FILES.getlist('portfolio_images')
@@ -136,6 +191,35 @@ class ServiceViewSet(viewsets.ModelViewSet):
                     image=image_file,
                     order=max_order + index + 1
                 )
+
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        """Установить порядок услуг: body { ids: [id1, id2, ...] }."""
+        ids = request.data.get('ids')
+        if not isinstance(ids, list) or not ids:
+            return Response(
+                {'error': 'Передайте ids — массив id услуг в нужном порядке.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        services = {
+            s.id: s
+            for s in Service.objects.filter(user=request.user, id__in=ids)
+        }
+        updated = []
+        for index, sid in enumerate(ids):
+            try:
+                sid_int = int(sid)
+            except (TypeError, ValueError):
+                continue
+            svc = services.get(sid_int)
+            if not svc:
+                continue
+            if svc.sort_order != index:
+                svc.sort_order = index
+                updated.append(svc)
+        if updated:
+            Service.objects.bulk_update(updated, ['sort_order'])
+        return Response({'ok': True, 'count': len(ids)})
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -975,6 +1059,12 @@ def public_booking_create_view(request, username):
                         f'({break_item.start_time.strftime("%H:%M")} - {break_item.end_time.strftime("%H:%M")}).'
                     )
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+    lead = normalize_booking_lead(getattr(user, 'booking_lead', None))
+    if not is_booking_datetime_allowed(lead, booking_date, booking_start_time):
+        return Response({
+            'error': booking_lead_error_message(lead),
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     # Создаем бронирование
     try:
@@ -1225,6 +1315,66 @@ def analytics_services_breakdown_view(request):
         )
 
     return Response(services_breakdown(request.user, start, end))
+
+
+def _parse_analytics_range(request):
+    start_str = request.query_params.get('start')
+    end_str = request.query_params.get('end')
+    if not start_str or not end_str:
+        return None, Response(
+            {'error': 'Укажите параметры start и end (YYYY-MM-DD).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        start = datetime.strptime(start_str, '%Y-%m-%d').date()
+        end = datetime.strptime(end_str, '%Y-%m-%d').date()
+    except ValueError:
+        return None, Response(
+            {'error': 'Некорректный формат даты. Используйте YYYY-MM-DD.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if start > end:
+        return None, Response(
+            {'error': 'Дата начала не может быть позже даты окончания.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return (start, end), None
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def analytics_overview_view(request):
+    """
+    Сводка аналитики: KPI, доход, период, клиенты.
+    GET /api/analytics/overview/?start=&end=&period=daily|weekly|monthly
+    """
+    require_pro_subscription(request.user)
+    parsed, err = _parse_analytics_range(request)
+    if err:
+        return err
+    start, end = parsed
+    period = request.query_params.get('period', 'daily')
+    if period not in ('daily', 'weekly', 'monthly'):
+        return Response(
+            {'error': 'period должен быть daily, weekly или monthly.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return Response(analytics_overview(request.user, start, end, period))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def analytics_load_view(request):
+    """
+    Загрузка, heatmap, выводы, популярные услуги.
+    GET /api/analytics/load/?start=&end=
+    """
+    require_pro_subscription(request.user)
+    parsed, err = _parse_analytics_range(request)
+    if err:
+        return err
+    start, end = parsed
+    return Response(load_analytics(request.user, start, end))
 
 
 @api_view(['GET'])
