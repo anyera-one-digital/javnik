@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { subscriptionStatusText } from '~/utils/subscription'
-import type { UserSubscription } from '~/types'
-
+/**
+ * Страница возврата с Т‑Банка после успешной оплаты.
+ * Без auth middleware — должна рендериться всегда после редиректа банка.
+ */
 definePageMeta({
-  layout: 'auth'
-  // без middleware auth — редирект с Т‑Банка должен открыть страницу даже если сессия «моргнула»
+  layout: false
 })
 
 useSeoMeta({
@@ -12,73 +12,56 @@ useSeoMeta({
 })
 
 const route = useRoute()
-const { fetchProfile, isAuthenticated } = useAuth()
-
-const subscription = ref<UserSubscription | null>(null)
-const loading = ref(true)
+const colorMode = useColorMode()
 
 const orderId = computed(() => {
   const q = route.query.orderId
   return typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
 })
 
-onMounted(async () => {
-  loading.value = true
-  try {
-    if (isAuthenticated.value) {
-      const profile = await fetchProfile()
-      if (profile?.subscription) {
-        subscription.value = profile.subscription
-      }
-    }
-  } finally {
-    loading.value = false
-  }
-})
-
-const statusText = computed(() => subscriptionStatusText(subscription.value))
+const isDark = computed(() => colorMode.value === 'dark')
 </script>
 
 <template>
-  <div class="w-full max-w-lg mx-auto space-y-4">
-    <UCard>
-      <div class="flex flex-col items-center text-center gap-3 py-4">
-        <UIcon name="i-lucide-circle-check" class="size-12 text-green-600" />
-        <h1 class="text-xl font-semibold">
+  <div
+    class="min-h-screen flex items-center justify-center px-4 py-10"
+    :class="isDark ? 'bg-[#1b1718] text-white' : 'bg-white text-gray-900'"
+  >
+    <div class="w-full max-w-md space-y-5">
+      <div
+        class="rounded-2xl border p-6 text-center space-y-3"
+        :class="isDark ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'"
+      >
+        <div
+          class="mx-auto flex size-14 items-center justify-center rounded-full"
+          :class="isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-600'"
+        >
+          <UIcon name="i-lucide-circle-check" class="size-8" />
+        </div>
+        <h1 class="text-xl font-semibold m-0">
           Спасибо за оплату!
         </h1>
-        <p class="text-sm text-muted m-0">
-          Подписка Pro будет активирована в течение минуты после подтверждения банком.
+        <p
+          class="text-sm m-0"
+          :class="isDark ? 'text-white/60' : 'text-gray-600'"
+        >
+          Подписка Pro активирована или будет активирована в течение минуты после подтверждения банком.
         </p>
-        <p v-if="orderId" class="text-xs text-muted m-0">
+        <p
+          v-if="orderId"
+          class="text-xs m-0 break-all"
+          :class="isDark ? 'text-white/40' : 'text-gray-400'"
+        >
           Номер заказа: {{ orderId }}
         </p>
       </div>
-    </UCard>
 
-    <UCard v-if="!loading && subscription" :ui="{ body: 'py-4' }">
-      <p class="text-sm text-muted m-0 mb-2">
-        Текущий тариф:
-      </p>
-      <UBadge color="neutral" variant="subtle">
-        {{ subscription.planLabel }}
-      </UBadge>
-      <p v-if="statusText" class="text-sm text-muted mt-2 mb-0">
-        {{ statusText }}
-      </p>
-    </UCard>
-
-    <UButton :to="isAuthenticated ? '/payment' : '/login'" color="neutral" block>
-      {{ isAuthenticated ? 'К тарифам' : 'Войти в кабинет' }}
-    </UButton>
-    <UButton
-      v-if="isAuthenticated"
-      to="/schedule"
-      variant="outline"
-      color="neutral"
-      block
-    >
-      В расписание
-    </UButton>
+      <UButton to="/payment" color="neutral" size="lg" block class="!rounded-xl">
+        К тарифам
+      </UButton>
+      <UButton to="/schedule" variant="outline" color="neutral" block class="!rounded-xl">
+        В расписание
+      </UButton>
+    </div>
   </div>
 </template>
