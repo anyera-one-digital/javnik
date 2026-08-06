@@ -100,6 +100,13 @@ def subscription_payment_init_view(request):
 
     success_url = f'{_frontend_base_url()}/payment/success?orderId={order_id}'
     fail_url = f'{_frontend_base_url()}/payment/fail?orderId={order_id}'
+    logger.info(
+        'T-Bank Init URLs order=%s success=%s fail=%s notify=%s',
+        order_id,
+        success_url,
+        fail_url,
+        notification_url,
+    )
 
     try:
         tbank_response = init_payment(
