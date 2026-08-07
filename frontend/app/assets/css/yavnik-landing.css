@@ -906,7 +906,7 @@ html.using-pointer :where(a, button, summary, [role='button'], [role='tab'], [ro
 .showcase-glow { position: absolute; top: 28%; left: 50%; width: 70%; aspect-ratio: 1.8; border-radius: 50%; background: color-mix(in srgb, var(--accent) 38%, transparent); filter: blur(100px); transform: translateX(-50%); }
 .showcase-section .container { position: relative; }
 .showcase-tabs { position: relative; z-index: 3; width: fit-content; margin: 44px auto 32px; padding: 5px; display: flex; gap: 4px; border: 1px solid color-mix(in srgb, var(--inverse-ink) 14%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--inverse-ink) 7%, transparent); backdrop-filter: blur(14px); }
-.showcase-tabs button { min-width: 96px; height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: color-mix(in srgb, var(--inverse-ink) 78%, transparent); font-size: 12px; font-weight: 750; cursor: pointer; transition: background .25s ease, color .25s ease; }
+.showcase-tabs button { flex: 0 0 auto; min-width: 96px; height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: color-mix(in srgb, var(--inverse-ink) 78%, transparent); font-size: 12px; font-weight: 750; white-space: nowrap; cursor: pointer; transition: background .25s ease, color .25s ease; }
 .showcase-tabs button:hover { color: var(--inverse-ink); background: color-mix(in srgb, var(--inverse-ink) 8%, transparent); }
 .showcase-tabs button.is-active { background: var(--surface); color: var(--ink); }
 .showcase-demo { width: min(1060px, 94%); margin: 0 auto; }
@@ -1013,6 +1013,7 @@ html.using-pointer :where(a, button, summary, [role='button'], [role='tab'], [ro
   width: min(100%, 420px);
   height: 420px;
   margin-inline: auto;
+  flex-shrink: 0;
 }
 .swap-card {
   position: absolute;
@@ -1299,7 +1300,12 @@ html.using-pointer :where(a, button, summary, [role='button'], [role='tab'], [ro
   .audience-copy, .faq-copy { position: static; }
   .features-grid, .steps-grid { grid-template-columns: 1fr 1fr; }
   .steps-grid .step-card:last-child { grid-column: 1 / -1; }
-  .comparison-stage { max-width: 420px; margin-inline: auto; }
+  .comparison-stage {
+    max-width: none;
+    width: 100%;
+    margin-inline: auto;
+    align-items: stretch;
+  }
   .pricing-head { grid-template-columns: 1fr; align-items: start; }
   .billing-toggle { margin-top: 10px; }
   .pricing-grid { grid-template-columns: 1fr; }
@@ -1368,25 +1374,43 @@ html.using-pointer :where(a, button, summary, [role='button'], [role='tab'], [ro
   .step-card:last-child { grid-column: auto; }
   .feature-card { min-height: 250px; }
   .feature-card h3 { margin-top: 56px; }
-  .showcase-tabs { width: 100%; margin-top: 30px; }
-  .showcase-tabs button { min-width: 0; flex: 1; padding: 0 8px; }
+  .showcase-tabs {
+    width: 100%;
+    max-width: 100%;
+    margin-top: 30px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+  }
+  .showcase-tabs::-webkit-scrollbar { display: none; }
+  .showcase-tabs button {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding: 0 16px;
+    white-space: nowrap;
+  }
   .showcase-demo { width: 100%; }
   .showcase-window { width: 100%; aspect-ratio: 4/3; border-radius: 18px 18px 0 0; }
   .showcase-demo__titles { left: 10px; right: 10px; bottom: 10px; max-width: none; }
   .audience-list { grid-template-columns: 1fr; }
   .audience-list article, .audience-list article:nth-child(2n) { border-right: 0; }
   .comparison-stack {
-    width: min(100%, 360px);
-    height: 380px;
+    width: calc(100% - 12px);
+    max-width: none;
+    height: 400px;
+    align-self: stretch;
   }
   .comparison-stack.is-before .swap-card--after {
-    transform: translate(28px, 14px) rotate(6deg) scale(.94);
+    transform: translate(14px, 12px) rotate(5deg) scale(.97);
   }
   .comparison-stack.is-after .swap-card--before {
-    transform: translate(-26px, 14px) rotate(-7deg) scale(.94);
+    transform: translate(-12px, 12px) rotate(-5deg) scale(.97);
   }
-  .swap-card { padding: 24px 20px; gap: 22px; }
-  .swap-card li { min-height: 48px; font-size: 14px; }
+  .swap-card { padding: 26px 22px; gap: 22px; }
+  .swap-card li { min-height: 50px; font-size: 15px; }
   .comparison-toggle button { min-width: 80px; }
   .billing-toggle { width: 100%; }
   .billing-toggle button { flex: 1; min-width: 0; }
